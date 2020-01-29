@@ -90,7 +90,7 @@ class Writer {
         const finalData = [];
 
         for (let i = 0; i < this.bufferIndex; i++) {
-          flushData[i] = this.buffer[i];
+          finalData[i] = this.buffer[i];
         }
 
         this.client.socket.send(this._writeChannel, finalData);
@@ -123,6 +123,7 @@ const serviceFactory = function(Service) {
     }
 
     async create(name, options = {}) {
+      name = name + ''; // force string
       // as create is synchronous server side, we can simply do that
       this.client.socket.send(`s:${this.name}:create`, name);
       return this.attach(name, options, true);

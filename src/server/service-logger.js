@@ -2,14 +2,6 @@ import Reader from './Reader.js';
 import Writer from './Writer.js';
 import path from 'path';
 
-const serverSchema = {
-
-}
-
-const clientSchema = {
-
-}
-
 let writerId = 0;
 
 const serviceFactory = function(Service) {
@@ -23,31 +15,17 @@ const serviceFactory = function(Service) {
       }
 
       this.options = this.configure(defaults, options);
-      // this.states = new Map();
-      // this.server.stateManager.registerSchema(`s:${this.name}`, schema);
-
       this.writers = new Set();
     }
 
     start() {
-      this.server.stateManager.observe(async (schemaName, clientId) => {
-        if (schemaName === `s:${this.name}`) {
-          const state = await this.server.stateManager.attach(schemaName, clientId);
-
-          this.states.set(clientId, state);
-
-          state.onDetach(() => {
-            this.states.delete(clientId);
-          });
-        }
-      });
-
       this.started();
 
       setTimeout(() => this.ready(), 1000);
     }
 
     create(name, options) {
+      name = name + '';
       const dirname = path.join(this.options.directory, path.dirname(name));
       const basename = path.basename(name);
       const id = (writerId += 1);
