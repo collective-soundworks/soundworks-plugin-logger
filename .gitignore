@@ -12,3 +12,6 @@ Thumbs.db
 
 # ...
 NOTES.md
+
+tests/.db
+tests/logs

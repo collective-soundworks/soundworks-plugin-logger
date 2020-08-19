@@ -61,14 +61,12 @@ class Writer {
    *                        appending a line break
    * @throws {Error} on creating directory or file
    */
-  constructor(options, onCloseCallback) {
+  constructor(options) {
     // mandatory
     this.id = options.id;
     this.name = options.name;
     this.basename = options.basename;
     this.dirname = path.join(path.resolve(options.dirname));
-
-    this.onClose = null;
 
     // options
     this.format = typeof options.format === 'function' ?
@@ -83,15 +81,13 @@ class Writer {
       }
     }
 
-    this.streamPath = path.join(this.dirname, `${date()}-${this.basename}`);
+    this.path = path.join(this.dirname, `${date()}-${this.basename}`);
 
     try {
-      this.stream = fs.createWriteStream(this.streamPath);
+      this.stream = fs.createWriteStream(this.path);
     } catch (error) {
-      console.error(`Error while creating write stream for ${this.streamPath}: ${error.message}`);
+      console.error(`Error while creating write stream for ${this.path}: ${error.message}`);
     }
-
-    this.subs = {};
   }
 
   /**
@@ -110,15 +106,15 @@ class Writer {
    *
    * @returns {Object} this
    */
-  close() {
-    // for (const s in this.subs) {
-    //   this.subs[s].close();
-    // }
-    if (this.onClose) {
-      this.onClose();
-    }
+  async close() {
+    return new Promise((resolve, reject) => {
+      this.stream.on('close', () => {
+        this.onClose();
+        resolve();
+      });
 
-    this.stream.end();
+      this.stream.end();
+    });
   }
 
   /**

@@ -1,2 +1,2 @@
-import serviceFactory from './service-logger.js';
-export default serviceFactory;
+import pluginFactory from './plugin-logger.js';
+export default pluginFactory;
