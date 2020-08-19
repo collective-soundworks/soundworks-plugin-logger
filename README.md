@@ -18,7 +18,6 @@
   * [Creating writers and log data](#creating-writers-and-log-data)
   * [Share a writer between several clients](#share-a-writer-between-several-clients)
   * [Buffering data to prevent network congestion](#buffering-data-to-prevent-network-congestion)
-- [Additional Documentation](#additional-documentation)
 - [Credits](#credits)
 - [License](#license)
 
@@ -191,8 +190,6 @@ const intervalId = setInterval(() => {
   }
 }, 1000);
 ```
-
-## Additional Documentation
 
 ## Credits
 
