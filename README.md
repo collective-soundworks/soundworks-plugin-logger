@@ -9,10 +9,10 @@
 - [Installation](#installation)
 - [Example](#example)
 - [Usage](#usage)
-  * [Server](#server)
+  * [Server installation](#server-installation)
     + [Registering the plugin](#registering-the-plugin)
     + [Requiring the plugin](#requiring-the-plugin)
-  * [Client](#client)
+  * [Client installation](#client-installation)
     + [Registering the plugin](#registering-the-plugin-1)
     + [Requiring the plugin](#requiring-the-plugin-1)
   * [Creating writers and log data](#creating-writers-and-log-data)
@@ -35,7 +35,7 @@ A working example can be found in the [https://github.com/collective-soundworks/
 
 ## Usage
 
-### Server
+### Server installation
 
 #### Registering the plugin
 
@@ -47,7 +47,7 @@ import pluginLoggerFactory from '@soundworks/plugin-logger/server';
 const server = new Server();
 server.pluginManager.register('logger', pluginPlatformFactory, {
   // define directory in which the files will be written
-  // (defaults to `.db/${plugin.name}`)
+  // (defaults to `.data/${plugin.name}`)
   directory: 'logs',
 }, []);
 ```
@@ -67,7 +67,7 @@ class MyExperience extends AbstractExperience {
 }
 ```
 
-### Client
+### Client installation
 
 #### Registering the plugin
 
