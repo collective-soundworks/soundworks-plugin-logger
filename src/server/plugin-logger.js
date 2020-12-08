@@ -58,6 +58,8 @@ const pluginFactory = function(AbstractPlugin) {
         client.socket.addListener(`s:${this.name}:${writer.id}:close`, () => {
           client.socket.removeAllListeners(`s:${this.name}:${writer.id}:close`);
 
+          // @todo - we should send an aknoledgement on close so that
+          // `await write.close` is really true
           writer.close();
         });
 
@@ -76,16 +78,11 @@ const pluginFactory = function(AbstractPlugin) {
           });
 
           client.socket.addListener(`s:${this.name}:${writer.id}`, data => {
-            data.forEach(entry => {
-              if (typeof entry === 'string') {
-                writer.write(entry);
-              } else {
-                writer.write(JSON.stringify(entry));
-              }
-            });
+            data.forEach(entry => writer.write(entry));
           });
 
           client.socket.addBinaryListener(`s:${this.name}:${writer.id}`, data => {
+            // @note - we need to unpack the buffered data before writing
             const headerSize = 1;
             const frameSize = data[0];
             const buffer = new Array(frameSize);
@@ -95,7 +92,7 @@ const pluginFactory = function(AbstractPlugin) {
                 buffer[j] = data[i + j];
               }
 
-              writer.write(JSON.stringify(buffer));
+              writer.write(buffer);
             }
           });
 

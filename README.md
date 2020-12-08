@@ -18,6 +18,7 @@
   * [Creating writers and log data](#creating-writers-and-log-data)
   * [Share a writer between several clients](#share-a-writer-between-several-clients)
   * [Buffering data to prevent network congestion](#buffering-data-to-prevent-network-congestion)
+- [Todos](#todos)
 - [Credits](#credits)
 - [License](#license)
 
@@ -190,6 +191,11 @@ const intervalId = setInterval(() => {
   }
 }, 1000);
 ```
+
+## Todos
+
+- `client:writer.close` should be async
+- `client:writer.write` should throw error to be consistent with server-side
 
 ## Credits
 

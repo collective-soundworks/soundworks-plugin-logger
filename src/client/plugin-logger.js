@@ -33,6 +33,7 @@ class Writer {
 
   write(data) {
     if (this._closed) {
+      // throw new Error(`write after end`);
       return;
     }
 

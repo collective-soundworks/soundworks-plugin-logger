@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import mkdirp from 'mkdirp';
 
 /**
@@ -37,6 +38,20 @@ export function date() {
   return `${year}${month}${day}-${hours}${minutes}${seconds}`;
 }
 
+function isStrictTypedArray(arr) {
+  return (
+       arr instanceof Int8Array
+    || arr instanceof Int16Array
+    || arr instanceof Int32Array
+    || arr instanceof Uint8Array
+    || arr instanceof Uint8ClampedArray
+    || arr instanceof Uint16Array
+    || arr instanceof Uint32Array
+    || arr instanceof Float32Array
+    || arr instanceof Float64Array
+  )
+}
+
 
 /**
  * Simple stream writer.
@@ -70,7 +85,23 @@ class Writer {
 
     // options
     this.format = typeof options.format === 'function' ?
-      options.format : message => `${message}\n`;
+      options.format : message => {
+        // if binary array given convert to array before stringify
+        if (isStrictTypedArray(message)) {
+          const arr = [];
+          for (let i = 0; i < message.length; i++) {
+            arr[i] = message[i];
+          }
+          message = arr;
+        }
+
+        // stringify everything that is not already a string
+        if (typeof message !== 'string') {
+          message = JSON.stringify(message);
+        }
+
+        return `${message}${os.EOL}`;
+      };
 
     if (!fs.existsSync(this.dirname)) {
       try {

@@ -15,3 +15,7 @@ NOTES.md
 
 tests/.db
 tests/logs
+
+# this is due to the tests, should be fixed soudnworks wise
+.db
+.data
