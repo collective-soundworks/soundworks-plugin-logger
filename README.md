@@ -46,7 +46,7 @@ import { Server } from '@soundworks/core/server';
 import pluginLoggerFactory from '@soundworks/plugin-logger/server';
 
 const server = new Server();
-server.pluginManager.register('logger', pluginPlatformFactory, {
+server.pluginManager.register('logger', pluginLoggerFactory, {
   // define directory in which the files will be written
   // (defaults to `.data/${plugin.name}`)
   directory: 'logs',
