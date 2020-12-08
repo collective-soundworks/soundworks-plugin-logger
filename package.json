@@ -1,6 +1,6 @@
 {
   "name": "@soundworks/plugin-logger",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "soundworks plugin for recording arbitrary data into files",
   "authors": [
     "Benjamin Matuszewski"
