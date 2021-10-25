@@ -128,7 +128,9 @@ class Writer {
    * @returns {Object} this
    */
   write(message) {
-    this.stream.write(this.format(message));
+    if (this.stream.writable) {
+      this.stream.write(this.format(message));
+    }
   }
 
   /**

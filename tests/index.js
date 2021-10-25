@@ -92,7 +92,9 @@ describe('server:plugin-logger', () => {
 
     const actual = fs.readFileSync(writer.path).toString();
     assert.equal(actual, expected, 'should properly write strings');
-    assert.throws(() => writer.write(`server-crash`), 'write after end');
+    // ignore write after end
+    writer.write(`do-not-log`);
+    assert.equal(actual, expected, 'should properly write strings');
 
     return Promise.resolve();
   });
