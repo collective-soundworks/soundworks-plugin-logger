@@ -27,6 +27,7 @@ class Writer {
     this.bufferIndex = 0;
     this.binary = null;
 
+    this._listeners = new Map();
     this._closed = false;
     this._writeChannel = `s:${this.pluginName}:${this.writerId}`;
   }
@@ -70,6 +71,8 @@ class Writer {
       } else {
         this.client.socket.send(this._writeChannel, this.buffer);
       }
+
+      this._dispatchEvent('packetsend');
     }
   }
 
@@ -96,6 +99,8 @@ class Writer {
 
         this.client.socket.send(this._writeChannel, finalData);
       }
+
+      this._dispatchEvent('packetsend');
     }
 
     // clean listeners server-side
@@ -103,6 +108,31 @@ class Writer {
     // if owner, close the writer
     if (this.owner) {
       this.client.socket.send(`s:${this.pluginName}:${this.writerId}:close`);
+    }
+  }
+
+  addEventListener(channel, func) {
+    if (!this._listeners.has(channel)) {
+      this._listeners.set(channel, new Set());
+    }
+
+    const listeners = this._listeners.get(channel);
+    listeners.add(func);
+  }
+
+  removeEventListener(channel, func) {
+    if (this._listeners.has(channel)) {
+      const listeners = this._listeners.get(channel);
+      listeners.delete(func);
+    }
+  }
+
+  _dispatchEvent(channel) {
+    // notify when a packet is sent
+    if (this._listeners.has(channel)) {
+      const listeners = this._listeners.get(channel);
+      const event = { type: channel };
+      listeners.forEach(func => func(event));
     }
   }
 }
