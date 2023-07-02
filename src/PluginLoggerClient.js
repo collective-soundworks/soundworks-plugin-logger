@@ -27,7 +27,7 @@ export default function(Plugin) {
     // - bufferSize=1
     // - usePrefix=true
     // - allowReuse=false (only is use prefix === false)
-    async createWriter(name, bufferSize = 1) {
+    async createWriter(name, { bufferSize = 1 } = {}) {
       return new Promise(async (resolve, reject) => {
         const state = await this.client.stateManager.create(`sw:plugin:${this.id}:writer`, {
           name,
@@ -63,7 +63,7 @@ export default function(Plugin) {
 
     // @todo options for API consistency
     // - bufferSize=1
-    async attachWriter(name, bufferSize = 1) {
+    async attachWriter(name, { bufferSize = 1 } = {}) {
       const list = this._internalState.get('list');
       const stateId = list[name];
 
