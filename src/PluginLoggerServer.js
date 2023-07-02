@@ -66,15 +66,21 @@ const writerSchema = {
     type: 'any',
     event: true,
   },
+  usePrefix: {
+    type: 'boolean',
+    default: true,
+  },
   // propagate errors client-side
-  error: {
+  errored: {
     type: 'string',
-    event: true,
+    default: null,
+    nullable: true,
   },
 
   cmd: {
     type: 'string',
-    event: true,
+    default: null,
+    nullable: true,
   },
 };
 
@@ -111,18 +117,24 @@ export default function(Plugin) {
           // attach to state and create writer
           const state = await this.server.stateManager.attach(schemaName, stateId);
           const name = state.get('name');
+          const usePrefix = state.get('usePrefix');
           let pathname = null;
 
           try {
-            pathname = this._getPathname(name);
+            pathname = this._getPathname(name, usePrefix);
           } catch (err) {
-            state.set({ error: err.message });
+            state.set({ errored: err.message });
             return;
           }
-
           // pathname is required by `writer.open()`, must be set before hand
           await state.set({ pathname });
-          await this._createAndRegisterWriter(nodeId, state, false);
+          // writer.open can throw too, e.g. file exists
+          try {
+            await this._createAndRegisterWriter(nodeId, state, false);
+          } catch (err) {
+            state.set({ errored: err.message });
+            return;
+          }
           // everything is ready, notify client that it can finish the instantiation
           await state.set({ cmd: 'ready' });
         }
@@ -152,7 +164,7 @@ export default function(Plugin) {
      * Return a full pathname form a writer name
      * @private
      */
-    _getPathname(name, usePrefix = false) {
+    _getPathname(name, usePrefix = true) {
       if (this.options.dirname === null) {
         throw new Error('[soundworks:PluginLogger] Cannot create writer, plugin is in "idle" state, call "logger.switch(dirname)" to activate the plugin');
       }

@@ -29,7 +29,9 @@ const config = {
 
 describe(`PluginLoggerClient`, () => {
   before(async () => {
-    await fs.promises.rm('tests/logs', { recursive: true })
+    if (fs.existsSync('tests/logs')) {
+      await fs.promises.rm('tests/logs', { recursive: true });
+    }
   });
 
   let server;
@@ -282,8 +284,8 @@ describe(`PluginLoggerClient`, () => {
     });
   });
 
-  describe(`# async createWriter(name)`, () => {
-    it(`should create a whole new writer`, async () => {
+  describe(`# async createWriter(name) -> WriterClient`, () => {
+    it(`should return a Writer`, async () => {
       const client = new Client(config);
       client.pluginManager.register('logger', pluginLoggerClient);
       await client.start();
@@ -296,9 +298,36 @@ describe(`PluginLoggerClient`, () => {
       assert.isFalse('create-log' in serverLogger._internalState.get('list'));
     });
 
+    it(`should return a Writer - usePrefix=false`, async () => {
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
+      const writer = await logger.createWriter('create-log-no-prefix', { usePrefix: false });
 
-    it.skip(`should propagete errors from the server`, () => {
-      // need usePrefix in create to be tested
+      assert.equal(writer.pathname, 'tests/logs/create-log-no-prefix.txt');
+    });
+
+    it(`should propagete errors from the server`, async () => {
+      fs.writeFileSync('tests/logs/file-exists.txt', '');
+
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
+
+      let errored = false;
+
+      try {
+        const writer = await logger.createWriter('file-exists.txt', { usePrefix: false });
+      } catch(err) {
+        console.log(err.message);
+        errored = true;
+      }
+
+      if (!errored) {
+        assert.fail('should have failed');
+      }
     });
   });
 

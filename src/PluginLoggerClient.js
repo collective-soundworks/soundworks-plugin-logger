@@ -27,15 +27,19 @@ export default function(Plugin) {
     // - bufferSize=1
     // - usePrefix=true
     // - allowReuse=false (only is use prefix === false)
-    async createWriter(name, { bufferSize = 1 } = {}) {
+    async createWriter(name, {
+      bufferSize = 1,
+      usePrefix = true,
+     } = {}) {
       return new Promise(async (resolve, reject) => {
         const state = await this.client.stateManager.create(`sw:plugin:${this.id}:writer`, {
           name,
+          usePrefix,
         });
 
-        // execute immediately as there may concurrency issue with the server
+        // execute immediately as there may be concurrency issues with the server
         // `stateManager.observe` does not ganratee order of execution
-        state.onUpdate(updates => {
+        state.onUpdate(async updates => {
           let writer;
 
           if ('cmd' in updates && updates.cmd !== null) {
@@ -53,9 +57,14 @@ export default function(Plugin) {
             }
           }
 
-          if ('error' in updates && updates.error !== null) {
-            state.delete();
-            reject(new Error(updates.error));
+          if ('errored' in updates && updates.errored !== null) {
+            if (writer) {
+              await writer.close();
+            } else {
+              await state.delete();
+            }
+
+            reject(new Error(updates.errored));
           }
         }, true);
       });
