@@ -29,7 +29,8 @@
   },
   "homepage": "https://soundworks.dev",
   "dependencies": {
-    "@ircam/sc-utils": "^1.1.1"
+    "@ircam/sc-utils": "^1.1.1",
+    "short-unique-id": "^4.4.4"
   },
   "devDependencies": {
     "@soundworks/core": "^4.0.0-alpha.7",

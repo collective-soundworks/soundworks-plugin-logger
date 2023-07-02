@@ -25,7 +25,9 @@ const config = {
 
 describe(`PluginLoggerServer`, () => {
   before(async () => {
-    await fs.promises.rm('tests/logs', { recursive: true })
+    if (fs.existsSync('tests/logs')) {
+      await fs.promises.rm('tests/logs', { recursive: true })
+    }
   });
 
   describe(`# [private] constructor(server, id, options)`, () => {
@@ -226,7 +228,7 @@ describe(`PluginLoggerServer`, () => {
       const list = logger._internalState.get('list');
 
       assert.isNumber(list['list.md']);
-      assert.isTrue(logger._writers.get(server).has(writer));
+      assert.isTrue(logger._writers.get(server.id).has(writer));
 
       await server.stop();
       // clean the file
@@ -355,11 +357,15 @@ describe(`PluginLoggerServer`, () => {
       // should resolve once the writer is close
       const list = logger._internalState.get('list');
       assert.isUndefined(list['server-test-close']);
-      assert.isFalse(logger._writers.get(server).has(writer));
+      assert.isFalse(logger._writers.get(server.id).has(writer));
 
       await server.stop();
       fs.rmSync(writer.pathname);
     });
+  });
+
+  describe('# reuse a logger amongst different server restart', () => {
+    it.skip('to implement (bypass file exists check?)', async () => {});
   });
 });
 

@@ -1,10 +1,5 @@
-# transpiled files
-/client
-/server
-/view
-
 # others
-/node_modules
+node_modules
 
 # junk files
 .DS_Store
@@ -12,10 +7,7 @@ Thumbs.db
 
 # ...
 NOTES.md
-
-tests/.db
 tests/logs
+TODOS.md
 
-# this is due to the tests, should be fixed soudnworks wise
-.db
-.data
+

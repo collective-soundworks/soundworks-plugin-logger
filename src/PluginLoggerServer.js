@@ -1,22 +1,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { idGenerator, isString } from '@ircam/sc-utils';
+import { isString, idGenerator } from '@ircam/sc-utils';
 
-import Writer from './WriterServer.js';
+import WriterServer from './WriterServer.js';
 
-const generator = idGenerator();
+const ids = idGenerator();
+
 
 /**
  * Pad a string with a prefix.
  * @param {String} prefix
  * @param {String} radical
  * @returns {String} concatenation of prefix + radical, sliced to the minimum of
- *  the prefix or radical size.
+ *  the prefix or radical size. (@note - this is not true)
  *
  * @private
  */
-export function pad(prefix, radical) {
+function pad(prefix, radical) {
   const string = typeof radical === 'string' ? radical : radical.toString();
   const slice = string.length > prefix.length ? prefix.length : -prefix.length;
 
@@ -24,11 +25,11 @@ export function pad(prefix, radical) {
 }
 
 /**
- * Returns a date suitable for a file name.
- * @returns {String} date as YYYYMMDD_hhmmss
+ * Returns a readable prefix suitable for a file name with date and unique Id
+ * @returns {String} date as YYYY.MM.DD_hh.mm.ss_uid_
  * @private
  */
-export function date() {
+function prefix() {
   const date = new Date();
 
   const year = date.getFullYear();
@@ -38,8 +39,10 @@ export function date() {
   const hours = pad('00', date.getHours());
   const minutes = pad('00', date.getMinutes());
   const seconds = pad('00', date.getSeconds());
+  // more robust than using millisesconds which could eventually be the same
+  const id = pad('0000', ids.next().value);
 
-  return `${year}${month}${day}-${hours}${minutes}${seconds}`;
+  return `${year}.${month}.${day}_${hours}.${minutes}.${seconds}_${id}_`;
 }
 
 const internalSchema = {
@@ -51,14 +54,6 @@ const internalSchema = {
 };
 
 const writerSchema = {
-  // id: {
-  //   type: 'integer',
-  //   default: -1,
-  // },
-  // nodeId: {
-  //   type: 'integer',
-  //   default: -1,
-  // },
   name: {
     type: 'string',
     default: '',
@@ -74,8 +69,12 @@ const writerSchema = {
   // propagate errors client-side
   error: {
     type: 'string',
-    default: null,
-    nullable: true,
+    event: true,
+  },
+
+  cmd: {
+    type: 'string',
+    event: true,
   },
 };
 
@@ -90,43 +89,49 @@ export default function(Plugin) {
       const defaults = {
         dirname: null,
         // add YYYYMMDD_hhmmss prefix to all writers filenames
+        // @todo - move at the create level
         usePrefix: true,
       };
 
       this.options = Object.assign(defaults, options);
       this._writers = new Map(); // <node, writers>
+
+      this.server.stateManager.registerSchema(`sw:plugin:${this.id}:internal`, internalSchema);
+      this.server.stateManager.registerSchema(`sw:plugin:${this.id}:writer`, writerSchema);
     }
 
     /** @private */
     async start() {
       await super.start();
-      //
-      this.server.stateManager.registerSchema(`sw:plugin:${this.id}:internal`, internalSchema);
+
+      // list of server side writer on which clients can attach
       this._internalState = await this.server.stateManager.create(`sw:plugin:${this.id}:internal`);
 
-      this.server.stateManager.registerSchema(`sw:plugin:${this.id}:writer`, writerSchema);
       // observe writter states created by clients
-      this.server.stateManager.observe(`sw:plugin:${this.id}:writer`, (schemaName, stateId) => {
-        // attach to state and create writer
-      });
+      this.server.stateManager.observe(
+        `sw:plugin:${this.id}:writer`,
+        async (schemaName, stateId, nodeId) => {
+          // attach to state and create writer
+          const state = await this.server.stateManager.attach(schemaName, stateId);
+          const name = state.get('name');
+          let pathname = null;
 
-      // move to switch
-      if (this.options.dirname !== null && !isString(this.options.dirname)) {
-        throw new Error(`[soundworks:PluginLogger] Invalid option "dirname", should be string or null`);
-      }
+          try {
+            pathname = this._getPathname(name);
+          } catch (err) {
+            state.set({ error: err.message });
+            return;
+          }
 
-      if (this.options.dirname === null) {
-        return;
-      }
-
-      if (!fs.existsSync(this.options.dirname)) {
-        try {
-          fs.mkdirSync(this.options.dirname, { recursive: true });
-        } catch(error) {
-          console.error(`[soundworks:PluginLogger] Error while creating "${this.options.dirname}" directory: ${error.message}`);
-          throw error;
+          // pathname is required by `writer.open()`, must be set before hand
+          await state.set({ pathname });
+          await this._createAndRegisterWriter(nodeId, state, false);
+          // everything is ready, notify client that it can finish the instantiation
+          await state.set({ cmd: 'ready' });
         }
-      }
+      );
+
+      await this.switch(this.options.dirname);
     }
 
     /** @private */
@@ -138,35 +143,19 @@ export default function(Plugin) {
     /** @private */
     async addClient(client) {
       await super.addClient(client);
-
-      // client.socket.addListener(`sw:plugin:${this.id}:data`, (data) => {
-      //   const { id, payload } = data;
-      //   const writer = this._writers.get(id);
-      //   payload.forEach(entry => writer.write(entry));
-      // });
     }
 
     /** @private */
     async removeClient(client) {
-      // client.socket.removeAllListeners(`sw:plugin:${this.id}:data`);
+      // delete all writers from this client
       await super.removeClient();
     }
 
-    async switch(dirname) {
-      throw new Error('@todo implement');
-      // close all existing states
-        // be carefull with flushing
-      // update this.options.dirname
-      // create new directory
-    }
-
     /**
-     * Create a writer
-     * @param {String} name - Name of the writer
+     * Return a full pathname form a writer name
+     * @private
      */
-    async createWriter(name) {
-      // @todo - refactor, handle writers created by clients
-
+    _getPathname(name) {
       if (this.options.dirname === null) {
         throw new Error('[soundworks:PluginLogger] Cannot create writer, plugin is in "idle" state, call "logger.switch(dirname)" to activate the plugin');
       }
@@ -190,10 +179,100 @@ export default function(Plugin) {
       }
 
       if (this.options.usePrefix === true) {
-        basename = `${date()}_${basename}`;
+        basename = `${prefix()}${basename}`;
       }
 
       const pathname = path.join(dirname, `${basename}${extname}`);
+
+      return pathname;
+    }
+
+    async _createAndRegisterWriter(nodeId, state, recordInList = false) {
+      const name = state.get('name');
+      // initialize the writer
+      const writer = new WriterServer(state);
+      await writer.open();
+
+      // clean state and storages when the writer is closed
+      writer.onClose = async () => {
+        // delete from internal list
+        if (recordInList) {
+          const list = this._internalState.get('list');
+          delete list[name];
+          await this._internalState.set({ list });
+        }
+        // delete state
+        await state.delete();
+        // remove from writers
+        const writers = this._writers.get(nodeId);
+        writers.delete(writer);
+      };
+
+      // store writer in writers
+      if (!this._writers.has(nodeId)) {
+        this._writers.set(nodeId, new Set());
+      }
+
+      // store the writer
+      const writers = this._writers.get(nodeId);
+      writers.add(writer);
+
+      // record server-side writers in global list
+      if (recordInList) {
+        const list = this._internalState.get('list');
+        list[name] = state.id;
+        await this._internalState.set({ list });
+      }
+
+      // pipe data from client to the writer
+      state.onUpdate(updates => {
+        if ('data' in updates) {
+          updates.data.forEach(datum => writer.write(datum));
+        }
+      });
+
+      return writer;
+    }
+
+    /**
+     * Helper that just return a string of yyyymmdd to help naming directories
+     */
+    getDatedPrefix() {
+      // @todo
+    }
+
+    async switch(dirname) {
+      // close all existing writers
+      // be carefull with flushing
+
+      if (dirname !== null && !isString(dirname)) {
+        throw new Error(`[soundworks:PluginLogger] Invalid option "dirname", should be string or null`);
+      }
+
+      this.options.dirname = dirname;
+
+      if (dirname === null) {
+        return;
+      }
+
+      if (!fs.existsSync(dirname)) {
+        try {
+          fs.mkdirSync(dirname, { recursive: true });
+        } catch(error) {
+          throw new Error(`[soundworks:PluginLogger] Error while creating "${dirname}" directory: ${error.message}`);
+        }
+      }
+    }
+
+    /**
+     * Create a writer
+     * @param {String} name - Name of the writer
+     */
+    // @todo - options
+    // - usePrefix=true
+    // - allowReuse=false (only is use prefix === false)
+    async createWriter(name, options = {}) {
+      const pathname = this._getPathname(name);
 
       // create underlying writer state
       const writerState = await this.server.stateManager.create(`sw:plugin:${this.id}:writer`, {
@@ -201,45 +280,7 @@ export default function(Plugin) {
         pathname,
       });
 
-      // create writer
-      const writer = new Writer(writerState);
-      await writer.open();
-
-      const node = this.server;
-
-      // clients should able to write in writers created by the server
-      writerState.onUpdate(updates => {
-        if ('data' in updates) {
-          // unpack buffer
-          updates.data.forEach(datum => writer.write(datum));
-        }
-      });
-
-      // store writer so it can be used from remote
-      writer.onClose = async () => {
-        // delete from internal list
-        const list = this._internalState.get('list');
-        delete list[name];
-        await this._internalState.set({ list });
-        // delete state
-        await writerState.delete();
-        // remove from writers
-        const writers = this._writers.get(node);
-        writers.delete(writer);
-      };
-
-      // store writer in writers
-      if (!this._writers.has(node)) {
-        this._writers.set(node, new Set());
-      }
-
-      const writers = this._writers.get(node);
-      writers.add(writer);
-
-      // add to global writer list
-      const list = this._internalState.get('list');
-      list[name] = writerState.id;
-      await this._internalState.set({ list });
+      const writer = await this._createAndRegisterWriter(this.server.id, writerState, true);
 
       return writer;
     }

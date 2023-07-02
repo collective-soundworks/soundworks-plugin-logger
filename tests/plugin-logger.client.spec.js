@@ -169,14 +169,13 @@ describe(`PluginLoggerClient`, () => {
       const logger = await client.pluginManager.get('logger');
       // values will be written after 5th call to write
       const writer = await logger.attachWriter('buffer-global-log', 5);
-      // put some delay to make sure things are logged in right order
       writer.write('coucou'); // string
       writer.write({ a: 42 }); // object
       writer.write([0, 1, 2, 3]); // arrays
       writer.write(true); // primitives
 
-      await delay(500);
       // file should be empty at this point
+      await delay(500);
       {
         const content = fs.readFileSync(writer.pathname).toString();
         const expected = '';
@@ -194,7 +193,7 @@ describe(`PluginLoggerClient`, () => {
     });
   });
 
-  describe.only(`# [attached] await WriterClient.close()`, () => {
+  describe(`# [attached] await WriterClient.close()`, () => {
     it(`should flush the buffer`, async () => {
       await serverLogger.createWriter('attached-simple-close');
 
@@ -278,38 +277,183 @@ describe(`PluginLoggerClient`, () => {
   });
 
   describe(`# async createWriter(name)`, () => {
-    it(`should throw if writer has not been created by the server`, async () => {
-      // const client = new Client(config);
-      // client.pluginManager.register('logger', pluginLoggerClient);
-      // await client.start();
-      // const logger = await client.pluginManager.get('logger');
+    it(`should create a whole new writer`, async () => {
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
 
-      // let errored = false;
+      const writer = await logger.createWriter('create-log');
 
-      // try {
-      //   const writer = await logger.attachWriter('global-log');
-      // } catch (err) {
-      //   console.log(err.message);
-      //   errored = true;
-      // }
-
-      // if (!errored) {
-      //   assert.fail('should have thrown');
-      // }
+      // should be in writers but not in the global list
+      assert.equal(serverLogger._writers.get(client.id).size, 1);
+      assert.isFalse('create-log' in serverLogger._internalState.get('list'));
     });
 
-    it(`no other nodes should be able to attach to the writter`, async () => {
-      // await serverLogger.createWriter('global-log');
 
-      // const client = new Client(config);
-      // client.pluginManager.register('logger', pluginLoggerClient);
-      // await client.start();
-      // const logger = await client.pluginManager.get('logger');
+    it.skip(`should propagete errors from the server`, () => {
+      // need usePrefix in create to be tested
+    });
+  });
 
-      // const writer = await logger.attachWriter('global-log');
+  describe(`# Writer.write(name)`, () => {
+    it(`should log values`, async () => {
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
 
-      // assert.equal(writer.name, 'global-log');
-      // assert.isTrue(writer.pathname.endsWith('global-log.txt'));
+      const writer = await logger.createWriter('create-log-write');
+      writer.write('coucou'); // string
+      writer.write({ a: 42 }); // object
+      writer.write([0, 1, 2, 3]); // arrays
+      writer.write(true); // primitives
+      writer.write(new Float32Array([0, 1, 2])); // typed array
+
+      await delay(100);
+
+      const content = fs.readFileSync(writer.pathname).toString();
+      const expected = `coucou\n{"a":42}\n[0,1,2,3]\ntrue\n[0,1,2]\n`;
+      assert.equal(content, expected);
+    });
+
+    it(`should buffer correctly`, async () => {
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
+
+      const writer = await logger.createWriter('create-log-buffer', 5);
+      writer.write('coucou'); // string
+      writer.write({ a: 42 }); // object
+      writer.write([0, 1, 2, 3]); // arrays
+      writer.write(true); // primitives
+      await delay(400);
+
+      {
+        const content = fs.readFileSync(writer.pathname).toString();
+        const expected = ``;
+        assert.equal(content, expected);
+      }
+
+      writer.write(new Float32Array([0, 1, 2])); // typed array
+
+      await delay(100);
+      {
+        const content = fs.readFileSync(writer.pathname).toString();
+        const expected = `coucou\n{"a":42}\n[0,1,2,3]\ntrue\n[0,1,2]\n`;
+        assert.equal(content, expected);
+      }
+    });
+
+    it(`client writers should not be shared`, async () => {
+      const serverWriter = await serverLogger.createWriter('create-log-same-name');
+
+      let clientWriter1;
+      let clientWriter2;
+
+      {
+        const client = new Client(config);
+        client.pluginManager.register('logger', pluginLoggerClient);
+        await client.start();
+        const logger = await client.pluginManager.get('logger');
+        // values will be written after 5th call to write
+        clientWriter1 = await logger.createWriter('create-log-same-name');
+        clientWriter1.write('a');
+      }
+
+      {
+        const client = new Client(config);
+        client.pluginManager.register('logger', pluginLoggerClient);
+        await client.start();
+        const logger = await client.pluginManager.get('logger');
+        // values will be written after 5th call to write
+        clientWriter2 = await logger.createWriter('create-log-shared');
+        clientWriter2.write('b');
+      }
+
+      serverWriter.write('c');
+      await delay(300);
+
+      {
+        const content = fs.readFileSync(clientWriter1.pathname).toString();
+        const expected = `a\n`;
+        assert.equal(content, expected);
+      }
+
+      {
+        const content = fs.readFileSync(clientWriter2.pathname).toString();
+        const expected = `b\n`;
+        assert.equal(content, expected);
+      }
+
+      {
+        const content = fs.readFileSync(serverWriter.pathname).toString();
+        const expected = `c\n`;
+        assert.equal(content, expected);
+      }
+    });
+  });
+
+  describe(`# async Writer.close()`, () => {
+    it(`should close the writer`, async () => {
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
+      // values will be written after 5th call to write
+      const writer = await logger.createWriter('create-log-close');
+      writer.write('a');
+
+      await writer.close();
+      writer.write('b'); // should not be written
+
+      await delay(100);
+
+      const content = fs.readFileSync(writer.pathname).toString();
+      const expected = `a\n`;
+      assert.equal(content, expected);
+    });
+
+    it(`should flush the buffer`, async () => {
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
+      // values will be written after 5th call to write
+      const writer = await logger.createWriter('create-log-close-flush', 5);
+      writer.write('a');
+      writer.write('a');
+      writer.write('a');
+      writer.write('a');
+      await writer.close();
+
+      await delay(100);
+
+      const content = fs.readFileSync(writer.pathname).toString();
+      const expected = `a\na\na\na\n`;
+      assert.equal(content, expected);
     });
   });
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
