@@ -82,7 +82,7 @@ describe(`PluginLoggerServer`, () => {
       let errored = false;
 
       try {
-        const writer = await logger.createWriter('coucou');
+        const writer = await logger.createWriter('fail');
       } catch (err) {
         console.log(err.message);
         errored = true;
@@ -126,7 +126,7 @@ describe(`PluginLoggerServer`, () => {
       let errored = false;
 
       try {
-        const writer = await logger.createWriter('../coucou');
+        const writer = await logger.createWriter('../outside');
       } catch (err) {
         console.log(err.message);
         errored = true;
@@ -149,12 +149,12 @@ describe(`PluginLoggerServer`, () => {
       server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
       await server.start();
       const logger = await server.pluginManager.get('logger');
-      const writer = await logger.createWriter('coucou');
+      const writer = await logger.createWriter('default_options');
 
-      assert.equal(writer.name, 'coucou');
+      assert.equal(writer.name, 'default_options');
       // file is prefixed with date
       assert.equal(writer.pathname.startsWith('tests/logs/'), true);
-      assert.equal(writer.pathname.endsWith('_coucou.txt'), true);
+      assert.equal(writer.pathname.endsWith('_default_options.txt'), true);
 
       assert.equal(fs.existsSync(writer.pathname), true);
 
@@ -166,12 +166,12 @@ describe(`PluginLoggerServer`, () => {
       server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
       await server.start();
       const logger = await server.pluginManager.get('logger');
-      const writer = await logger.createWriter('a/coucou');
+      const writer = await logger.createWriter('inner/create_writer_recursive');
 
-      assert.equal(writer.name, 'a/coucou');
+      assert.equal(writer.name, 'inner/create_writer_recursive');
       // file is prefixed with date
-      assert.equal(writer.pathname.startsWith('tests/logs/a/'), true);
-      assert.equal(writer.pathname.endsWith('_coucou.txt'), true);
+      assert.equal(writer.pathname.startsWith('tests/logs/inner/'), true);
+      assert.equal(writer.pathname.endsWith('_create_writer_recursive.txt'), true);
 
       assert.equal(fs.existsSync(writer.pathname), true);
 
@@ -180,39 +180,29 @@ describe(`PluginLoggerServer`, () => {
 
     it(`should return a Writer - usePrefix=false`, async () => {
       const server = new Server(config);
-      server.pluginManager.register('logger', pluginLoggerServer, {
-        dirname: 'tests/logs',
-        usePrefix: false,
-      });
-
+      server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
       await server.start();
       const logger = await server.pluginManager.get('logger');
-      const writer = await logger.createWriter('a/coucou');
+      const writer = await logger.createWriter('create_writer_no_prefix', { usePrefix: false });
 
-      assert.equal(writer.name, 'a/coucou');
-      assert.equal(writer.pathname, 'tests/logs/a/coucou.txt');
+      assert.equal(writer.name, 'create_writer_no_prefix');
+      assert.equal(writer.pathname, 'tests/logs/create_writer_no_prefix.txt');
       // file is not prefixed
-      assert.equal(fs.existsSync('tests/logs/a/coucou.txt'), true);
+      assert.equal(fs.existsSync('tests/logs/create_writer_no_prefix.txt'), true);
 
       await server.stop();
     });
 
     it(`should not override extension if given`, async () => {
       const server = new Server(config);
-      server.pluginManager.register('logger', pluginLoggerServer, {
-        dirname: 'tests/logs',
-        usePrefix: false,
-      });
-
+      server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
       await server.start();
       const logger = await server.pluginManager.get('logger');
-      const writer = await logger.createWriter('a/coucou.md');
+      const writer = await logger.createWriter('create_writer_keep_ext.md', { usePrefix: false });
 
-      writer.write('niap');
-
-      assert.equal(writer.name, 'a/coucou.md');
-      // file is not prefixed and extensio is kept intact
-      assert.isTrue(fs.existsSync('tests/logs/a/coucou.md'));
+      assert.equal(writer.name, 'create_writer_keep_ext.md');
+      // file is not prefixed and extension is kept intact
+      assert.isTrue(fs.existsSync('tests/logs/create_writer_keep_ext.md'));
 
       await server.stop();
     });
@@ -223,11 +213,11 @@ describe(`PluginLoggerServer`, () => {
 
       await server.start();
       const logger = await server.pluginManager.get('logger');
-      const writer = await logger.createWriter('list.md');
+      const writer = await logger.createWriter('in_list.md');
 
       const list = logger._internalState.get('list');
 
-      assert.isNumber(list['list.md']);
+      assert.isNumber(list['in_list.md']);
       assert.isTrue(logger._writers.get(server.id).has(writer));
 
       await server.stop();

@@ -26,7 +26,7 @@ function pad(prefix, radical) {
 
 /**
  * Returns a readable prefix suitable for a file name with date and unique Id
- * @returns {String} date as YYYY.MM.DD_hh.mm.ss_uid_
+ * @returns {String} prefix as YYYY.MM.DD_hh.mm.ss_uid_
  * @private
  */
 function prefix() {
@@ -88,9 +88,6 @@ export default function(Plugin) {
 
       const defaults = {
         dirname: null,
-        // add YYYYMMDD_hhmmss prefix to all writers filenames
-        // @todo - move at the create level
-        usePrefix: true,
       };
 
       this.options = Object.assign(defaults, options);
@@ -155,7 +152,7 @@ export default function(Plugin) {
      * Return a full pathname form a writer name
      * @private
      */
-    _getPathname(name) {
+    _getPathname(name, usePrefix = false) {
       if (this.options.dirname === null) {
         throw new Error('[soundworks:PluginLogger] Cannot create writer, plugin is in "idle" state, call "logger.switch(dirname)" to activate the plugin');
       }
@@ -178,7 +175,7 @@ export default function(Plugin) {
         extname = '.txt';
       }
 
-      if (this.options.usePrefix === true) {
+      if (usePrefix === true) {
         basename = `${prefix()}${basename}`;
       }
 
@@ -267,12 +264,15 @@ export default function(Plugin) {
     /**
      * Create a writer
      * @param {String} name - Name of the writer
+     * @param {Object} options - Options for the writer
+     * @param {Boolean} [usePrefix=true] - Whether the writer file should be prefixed
+     *  with a `YYYY.MM.DD_hh.mm.ss_uid_` string.
      */
     // @todo - options
     // - usePrefix=true
     // - allowReuse=false (only is use prefix === false)
-    async createWriter(name, options = {}) {
-      const pathname = this._getPathname(name);
+    async createWriter(name, { usePrefix = true } = {}) {
+      const pathname = this._getPathname(name, usePrefix);
 
       // create underlying writer state
       const writerState = await this.server.stateManager.create(`sw:plugin:${this.id}:writer`, {
