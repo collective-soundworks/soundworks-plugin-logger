@@ -12,21 +12,32 @@ export default function(Plugin) {
       this._internalState = null;
     }
 
+    /** @private */
     async start() {
       this._internalState = await this.client.stateManager.attach(`sw:plugin:${this.id}:internal`);
 
       super.start();
     }
 
+    /** @private */
     async stop() {
       // close all writers, can be done erver side actually...
       super.stop();
     }
 
-    // @todo options
-    // - bufferSize=1
-    // - usePrefix=true
-    // - allowReuse=false (only is use prefix === false)
+    /**
+     * Create a writer
+     * @param {String} name - Name of the writer.
+     * @param {Object} options - Options for the writer.
+     * @param {Number} [bufferSize=1] - Number of writes buffered before sending
+     *  the logs to the server.
+     * @param {Boolean} [usePrefix=true] - Whether the writer file should be prefixed
+     *  with a `YYYY.MM.DD_hh.mm.ss_uid_` string.
+     * @param {Boolean} [allowReuse=false] - If `usePrefix` is false, allow to reuse an
+     *  existing underlying file for the writer. New data will be appended to the file.
+     *  Can be usefull to log global informations in the same file amongst different
+     *  sessions.
+     */
     async createWriter(name, {
       bufferSize = 1,
       usePrefix = true,
@@ -72,8 +83,14 @@ export default function(Plugin) {
       });
     }
 
-    // @todo options for API consistency
-    // - bufferSize=1
+    /**
+     * Attach to a shared writer created by the server. Can be usefull to create
+     * files that gather informations from multiple nodes.
+     * @param {String} name - Name of the writer.
+     * @param {Object} options - Options for the writer.
+     * @param {Number} [bufferSize=1] - Number of writes buffered before sending
+     *  the logs to the server.
+     */
     async attachWriter(name, { bufferSize = 1 } = {}) {
       const list = this._internalState.get('list');
       const stateId = list[name];

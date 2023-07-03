@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { isString, idGenerator } from '@ircam/sc-utils';
+import { isString, isPlainObject, idGenerator } from '@ircam/sc-utils';
 
 import WriterServer from './WriterServer.js';
 
@@ -106,6 +106,80 @@ export default function(Plugin) {
     }
 
     /** @private */
+    _getPathname(name, usePrefix = true) {
+      if (this.options.dirname === null) {
+        throw new Error('[soundworks:PluginLogger] Cannot create writer, plugin is in "idle" state, call "logger.switch(dirname)" to activate the plugin');
+      }
+
+      if (!isString(name)) {
+        throw new Error(`[soundworks:PluginLogger] Invalid argument for "logger.createWriter(name)", "name" must be a string`);
+      }
+
+      const dirname = path.join(this.options.dirname, path.dirname(name));
+      const relPath = path.relative(this.options.dirname, dirname);
+
+      if (relPath.startsWith('..')) {
+        throw new Error(`[soundworks:PluginLogger] Invalid argument for "logger.createWriter(name)", cannot create writer outside directory`);
+      }
+
+      let extname = path.extname(name);
+      let basename = path.basename(name, extname);
+      // default to .txt if not given
+      if (extname === '' || extname === '.') {
+        extname = '.txt';
+      }
+
+      if (usePrefix === true) {
+        basename = `${prefix()}${basename}`;
+      }
+
+      const pathname = path.join(dirname, `${basename}${extname}`);
+
+      return pathname;
+    }
+
+    /** @private */
+    async _createAndRegisterWriter(nodeId, state) {
+      const name = state.get('name');
+      // initialize the writer
+      const writer = new WriterServer(state);
+      // clean state and storages when the writer is closed
+      writer.beforeClose = async () => {
+        // only server-side created writers are recorded in global list
+        if (nodeId === this.server.id) {
+          // delete from internal list
+          const list = this._internalState.get('list');
+          delete list[name];
+          await this._internalState.set({ list });
+        }
+
+        // remove from writers from the different maps
+        this._pathnameWriterMap.delete(writer.pathname);
+        this._nodeIdWritersMap.get(nodeId).delete(writer);
+      };
+
+      await writer.open();
+
+      // store the writer in the different maps
+      this._pathnameWriterMap.set(writer.pathname, writer);
+
+      if (!this._nodeIdWritersMap.has(nodeId)) {
+        this._nodeIdWritersMap.set(nodeId, new Set());
+      }
+
+      this._nodeIdWritersMap.get(nodeId).add(writer);
+
+      // record server-side writers in global list
+      if (nodeId === this.server.id) {
+        const list = this._internalState.get('list');
+        list[name] = state.id;
+        await this._internalState.set({ list });
+      }
+
+      return writer;
+    }
+
+    /** @private */
     async start() {
       await super.start();
 
@@ -189,89 +263,36 @@ export default function(Plugin) {
     }
 
     /**
-     * Return a full pathname form a writer name
-     * @private
-     */
-    _getPathname(name, usePrefix = true) {
-      if (this.options.dirname === null) {
-        throw new Error('[soundworks:PluginLogger] Cannot create writer, plugin is in "idle" state, call "logger.switch(dirname)" to activate the plugin');
-      }
-
-      if (!isString(name)) {
-        throw new Error(`[soundworks:PluginLogger] Invalid argument for "logger.createWriter(name)", "name" must be a string`);
-      }
-
-      const dirname = path.join(this.options.dirname, path.dirname(name));
-      const relPath = path.relative(this.options.dirname, dirname);
-
-      if (relPath.startsWith('..')) {
-        throw new Error(`[soundworks:PluginLogger] Invalid argument for "logger.createWriter(name)", cannot create writer outside directory`);
-      }
-
-      let extname = path.extname(name);
-      let basename = path.basename(name, extname);
-      // default to .txt if not given
-      if (extname === '' || extname === '.') {
-        extname = '.txt';
-      }
-
-      if (usePrefix === true) {
-        basename = `${prefix()}${basename}`;
-      }
-
-      const pathname = path.join(dirname, `${basename}${extname}`);
-
-      return pathname;
-    }
-
-    async _createAndRegisterWriter(nodeId, state) {
-      const name = state.get('name');
-      // initialize the writer
-      const writer = new WriterServer(state);
-      // clean state and storages when the writer is closed
-      writer.beforeClose = async () => {
-        // only server-side created writers are recorded in global list
-        if (nodeId === this.server.id) {
-          // delete from internal list
-          const list = this._internalState.get('list');
-          delete list[name];
-          await this._internalState.set({ list });
-        }
-
-        // remove from writers from the different maps
-        this._pathnameWriterMap.delete(writer.pathname);
-        this._nodeIdWritersMap.get(nodeId).delete(writer);
-      };
-
-      await writer.open();
-
-      // store the writer in the different maps
-      this._pathnameWriterMap.set(writer.pathname, writer);
-
-      if (!this._nodeIdWritersMap.has(nodeId)) {
-        this._nodeIdWritersMap.set(nodeId, new Set());
-      }
-
-      this._nodeIdWritersMap.get(nodeId).add(writer);
-
-      // record server-side writers in global list
-      if (nodeId === this.server.id) {
-        const list = this._internalState.get('list');
-        list[name] = state.id;
-        await this._internalState.set({ list });
-      }
-
-      return writer;
-    }
-
-    /**
      * Helper that just return a string of yyyymmdd to help naming directories
      */
-    getDatedPrefix() {
-      // @todo
-    }
+    // getDatedPrefix() {
+    //   // @todo
+    // }
 
+    /**
+     * Switch the plugin to use another directory. Closes all existing writers.
+     *
+     * @param {String|Object} dirname - Path to the new directory. As a convenience
+     *  to match the plugin filesystem API, an object containing the 'dirname' key
+     *  can also be passed
+     */
     async switch(dirname) {
+      // support switch({ dirname }) API to match filesystem API
+      if (isPlainObject(dirname)) {
+        if (!('dirname' in dirname)) {
+          throw new Error(`[soundworks:PluginScripting] Invalid argument for method switch, argument should contain a "dirname" key`);
+        }
+
+        dirname = dirname.dirname;
+      }
+
+      // @todo - be carefull with flushing for now it will just be a "do what you can" startegy
+      if (dirname !== null && !isString(dirname)) {
+        throw new Error(`[soundworks:PluginLogger] Invalid option "dirname", should be string or null`);
+      }
+
+      this.options.dirname = dirname;
+
       // close all existing writers
       for (let [nodeId, writers] of this._nodeIdWritersMap.entries()) {
         for (let writer of writers) {
@@ -282,13 +303,6 @@ export default function(Plugin) {
           }
         }
       }
-
-      // @todo - be carefull with flushing for now it will just be a "do what you can" startegy
-      if (dirname !== null && !isString(dirname)) {
-        throw new Error(`[soundworks:PluginLogger] Invalid option "dirname", should be string or null`);
-      }
-
-      this.options.dirname = dirname;
 
       if (dirname === null) {
         return;

@@ -448,7 +448,21 @@ describe(`PluginLoggerServer`, () => {
     });
   });
 
-  describe.only('switch(dirnname)', () => {
+  describe('switch(dirnname)', () => {
+    it(`should accepet string or object (see plugin-filesystem and plugin-scripting)`, async () => {
+      const server = new Server(config);
+      server.pluginManager.register('logger', pluginLoggerServer);
+      await server.start();
+      const logger = await server.pluginManager.get('logger');
+
+      await logger.switch({ dirname: 'tests/logs' });
+      assert.equal(logger.options.dirname, 'tests/logs');
+      await logger.switch('tests/switch');
+      assert.equal(logger.options.dirname, 'tests/switch');
+
+      await server.stop();
+    })
+
     it('should behave as expected', async () => {
       const server = new Server(config);
       server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
