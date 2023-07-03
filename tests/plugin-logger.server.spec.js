@@ -189,7 +189,7 @@ describe(`PluginLoggerServer`, () => {
       const list = logger._internalState.get('list');
 
       assert.isNumber(list['in_list.md']);
-      assert.isTrue(logger._writers.get(server.id).has(writer));
+      assert.isTrue(logger._nodeIdWritersMap.get(server.id).has(writer));
 
       await server.stop();
       // clean the file
@@ -404,7 +404,7 @@ describe(`PluginLoggerServer`, () => {
       // should resolve once the writer is close
       const list = logger._internalState.get('list');
       assert.isUndefined(list['server-test-close']);
-      assert.isFalse(logger._writers.get(server.id).has(writer));
+      assert.isFalse(logger._nodeIdWritersMap.get(server.id).has(writer));
 
       await server.stop();
       fs.rmSync(writer.pathname);

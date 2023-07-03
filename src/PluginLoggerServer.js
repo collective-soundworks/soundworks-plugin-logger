@@ -62,11 +62,7 @@ const writerSchema = {
     type: 'string',
     default: '',
   },
-  data: {
-    type: 'any',
-    event: true,
-  },
-  // options
+  // writer options
   usePrefix: {
     type: 'boolean',
     default: true,
@@ -102,7 +98,8 @@ export default function(Plugin) {
       };
 
       this.options = Object.assign(defaults, options);
-      this._writers = new Map(); // <node, writers>
+      this._nodeIdWritersMap = new Map(); // <node, writers>
+      this._pathnameWriterMap = new Map(); // <pathname, writer>
 
       this.server.stateManager.registerSchema(`sw:plugin:${this.id}:internal`, internalSchema);
       this.server.stateManager.registerSchema(`sw:plugin:${this.id}:writer`, writerSchema);
@@ -133,13 +130,16 @@ export default function(Plugin) {
           }
           // pathname is required by `writer.open()`, must be set before hand
           await state.set({ pathname });
+          let writer = null;
           // writer.open can throw too, e.g. file exists
           try {
-            await this._createAndRegisterWriter(nodeId, state, false);
+            writer = await this._createAndRegisterWriter(nodeId, state);
+            state.onDetach(async () => await writer.close());
           } catch (err) {
             state.set({ errored: err.message });
             return;
           }
+
           // everything is ready, notify client that it can finish the instantiation
           await state.set({ cmd: 'ready' });
         }
@@ -157,11 +157,33 @@ export default function(Plugin) {
     /** @private */
     async addClient(client) {
       await super.addClient(client);
+
+      // pipe data sent from the client to the right writer
+      client.socket.addListener(`sw:plugin:${this.id}:data`, msg => {
+        const { pathname, data } = msg;
+        // we need this check because the client may still send some data in attached
+        // writer, between call to  WriterServer.close() and the actual detach on client
+        if (this._pathnameWriterMap.has(pathname)) {
+          const writer = this._pathnameWriterMap.get(pathname);
+          data.forEach(datum => writer.write(datum))
+        }
+      });
     }
 
     /** @private */
     async removeClient(client) {
-      // delete all writers from this client
+      client.socket.removeAllListeners(`sw:plugin:${this.id}:data`);
+
+      // delete all writers owned by this client
+      // calling `close`` will clean the maps
+      const writers = this._nodeIdWritersMap.get(client.id);
+      // await so that close don't try to acces an empty this._nodeIdWritersMap set
+      for (let writer of writers) {
+        await writer.close();
+      }
+
+      this._nodeIdWritersMap.delete(client.id);
+
       await super.removeClient();
     }
 
@@ -201,50 +223,42 @@ export default function(Plugin) {
       return pathname;
     }
 
-    async _createAndRegisterWriter(nodeId, state, recordInList = false) {
+    async _createAndRegisterWriter(nodeId, state) {
       const name = state.get('name');
       // initialize the writer
       const writer = new WriterServer(state);
       // clean state and storages when the writer is closed
       writer.beforeClose = async () => {
-        // delete the state
-        await state.delete();
-        // delete from internal list
-        if (recordInList) {
+        // only server-side created writers are recorded in global list
+        if (nodeId === this.server.id) {
+          // delete from internal list
           const list = this._internalState.get('list');
           delete list[name];
           await this._internalState.set({ list });
         }
 
-        // remove from writers
-        const writers = this._writers.get(nodeId);
-        writers.delete(writer);
+        // remove from writers from the different maps
+        this._pathnameWriterMap.delete(writer.pathname);
+        this._nodeIdWritersMap.get(nodeId).delete(writer);
       };
 
       await writer.open();
 
-      // store writer in writers
-      if (!this._writers.has(nodeId)) {
-        this._writers.set(nodeId, new Set());
+      // store the writer in the different maps
+      this._pathnameWriterMap.set(writer.pathname, writer);
+
+      if (!this._nodeIdWritersMap.has(nodeId)) {
+        this._nodeIdWritersMap.set(nodeId, new Set());
       }
 
-      // store the writer
-      const writers = this._writers.get(nodeId);
-      writers.add(writer);
+      this._nodeIdWritersMap.get(nodeId).add(writer);
 
       // record server-side writers in global list
-      if (recordInList) {
+      if (nodeId === this.server.id) {
         const list = this._internalState.get('list');
         list[name] = state.id;
         await this._internalState.set({ list });
       }
-
-      // pipe data from client to the writer
-      state.onUpdate(updates => {
-        if ('data' in updates) {
-          updates.data.forEach(datum => writer.write(datum));
-        }
-      });
 
       return writer;
     }
@@ -304,7 +318,7 @@ export default function(Plugin) {
         allowReuse,
       });
 
-      const writer = await this._createAndRegisterWriter(this.server.id, writerState, true);
+      const writer = await this._createAndRegisterWriter(this.server.id, writerState);
 
       return writer;
     }

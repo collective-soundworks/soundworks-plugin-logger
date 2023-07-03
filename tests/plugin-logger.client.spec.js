@@ -282,6 +282,28 @@ describe(`PluginLoggerClient`, () => {
       const expected = `a\nb\nc\n`;
       assert.equal(content, expected);
     });
+
+
+    it(`should close if the owner closes the writer`, async () => {
+      const serverWriter = await serverLogger.createWriter('attached-owner-close');
+
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
+
+      const writer = await logger.attachWriter('attached-owner-close');
+
+      let onCloseCalled = false;
+      writer.onClose(() => onCloseCalled = true);
+
+      // close writer and wait for network propagation
+      // @note some writes may occur in between, this must be handle by the server
+      await serverWriter.close();
+      await delay(200);
+
+      assert.equal(onCloseCalled, true);
+    });
   });
 
   describe(`# async createWriter(name) -> WriterClient`, () => {
@@ -294,7 +316,7 @@ describe(`PluginLoggerClient`, () => {
       const writer = await logger.createWriter('create-log');
 
       // should be in writers but not in the global list
-      assert.equal(serverLogger._writers.get(client.id).size, 1);
+      assert.equal(serverLogger._nodeIdWritersMap.get(client.id).size, 1);
       assert.isFalse('create-log' in serverLogger._internalState.get('list'));
     });
 
@@ -533,6 +555,50 @@ describe(`PluginLoggerClient`, () => {
         const expected = `a\na\na\na\n`;
         assert.equal(content, expected);
       }
+    });
+
+    it(`should be cleaned out server side`, async () => {
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
+      // values will be written after 5th call to write
+      const writer = await logger.createWriter('create-log-close-clean');
+
+      await writer.close();
+      // delay(100); // not sure we can rely on this consecutive appearence
+
+      assert.equal(serverLogger._nodeIdWritersMap.get(client.id).size, 0);
+    });
+  });
+
+  describe(`# Writer.onClose(callback)`, () => {
+    it(`should have consistent order of execution`, async () => {
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
+      const writer = await logger.createWriter('server-test-onclose');
+
+      let step = 0;
+      let onCloseExecuted = false;
+
+      // callback should be executed before `close` resolves
+      writer.onClose(async () => {
+        delay(100);
+        onCloseExecuted = true;
+        step += 1;
+        assert.equal(step, 1);
+      });
+
+      await writer.close();
+
+      step += 1;
+      assert.equal(step, 2);
+      assert.isTrue(onCloseExecuted);
+
+      await client.stop();
+      fs.rmSync(writer.pathname);
     });
   });
 });

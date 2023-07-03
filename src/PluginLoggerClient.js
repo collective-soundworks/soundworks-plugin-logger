@@ -47,7 +47,7 @@ export default function(Plugin) {
           if ('cmd' in updates && updates.cmd !== null) {
             switch (updates.cmd) {
               case 'ready': {
-                writer = new WriterClient(state, bufferSize);
+                writer = new WriterClient(this, state, bufferSize);
                 resolve(writer);
                 break;
               }
@@ -83,7 +83,7 @@ export default function(Plugin) {
       }
 
       const writerState = await this.client.stateManager.attach(`sw:plugin:${this.id}:writer`, stateId);
-      const writer = new WriterClient(writerState, bufferSize);
+      const writer = new WriterClient(this, writerState, bufferSize);
 
       return writer;
     }

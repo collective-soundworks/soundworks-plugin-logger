@@ -132,6 +132,10 @@ class WriterServer {
   async close() {
     // clean state and everything before actually closing the stream
     await this.beforeClose();
+    // if the writer has been created by the server, delete the state
+    if (this._state.isOwner) {
+      await this._state.delete();
+    }
 
     return new Promise((resolve, reject) => {
       // wait for the stream close event
