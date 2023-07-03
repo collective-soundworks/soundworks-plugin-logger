@@ -42,6 +42,14 @@ class WriterServer {
     }
 
     this._stream = null;
+    this._onCloseCallbacks = new Set();
+    /**
+     * Protected function executed at the beginning of `close()`. Declared by the
+     * logger for bookkeeping.
+     * @type Function
+     * @private
+     */
+    this.beforeClose = null;
   }
 
   /**
@@ -123,15 +131,32 @@ class WriterServer {
    */
   async close() {
     // clean state and everything before actually closing the stream
-    await this.onClose();
+    await this.beforeClose();
 
     return new Promise((resolve, reject) => {
-      this._stream.on('close', () => {
+      // wait for the stream close event
+      this._stream.on('close', async () => {
+        for (let callback of this._onCloseCallbacks) {
+          await callback();
+        }
+
         resolve();
       });
 
       this._stream.end();
     });
+  }
+
+  /**
+   * Register a function to be executed when the Writer is closed. The function
+   * will be executed when the underlying stream is closed and before the `close()`
+   * Promise is resolved.
+   * @param {Function} callback - Function to execute on close.
+   * @returns Function that unregister the listener when executed.
+   */
+  onClose(callback) {
+    this._onCloseCallbacks.add(callback);
+    return () => this._onCloseCallbacks.delete(callback);
   }
 }
 

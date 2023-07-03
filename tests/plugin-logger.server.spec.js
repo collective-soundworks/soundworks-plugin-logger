@@ -411,8 +411,34 @@ describe(`PluginLoggerServer`, () => {
     });
   });
 
-  describe('# reuse a logger amongst different server restart', () => {
-    it.skip('to implement (bypass file exists check?)', async () => {});
+  describe(`# Writer.onClose(callback)`, () => {
+    it(`should have consistent order of execution`, async () => {
+      const server = new Server(config);
+      server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
+      await server.start();
+      const logger = await server.pluginManager.get('logger');
+      const writer = await logger.createWriter('server-test-onclose');
+
+      let step = 0;
+      let onCloseExecuted = false;
+
+      // callback should be executed before `close` resolves
+      writer.onClose(async () => {
+        delay(100);
+        onCloseExecuted = true;
+        step += 1;
+        assert.equal(step, 1);
+      });
+
+      await writer.close();
+
+      step += 1;
+      assert.equal(step, 2);
+      assert.isTrue(onCloseExecuted);
+
+      await server.stop();
+      fs.rmSync(writer.pathname);
+    });
   });
 });
 

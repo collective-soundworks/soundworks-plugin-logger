@@ -39,6 +39,7 @@ class WriterClient {
 
     if (this._bufferIndex === 0) {
       // buffer is full, send data
+      // @todo - this is silly, just send a raw message
       this._state.set({ data: this._buffer });
       this._onPacketSendListeners.forEach(callback => callback());
     }
@@ -50,7 +51,9 @@ class WriterClient {
     // flush remaining buffered data
     if (this._bufferSize > 1 && this._bufferIndex > 0) {
       this._buffer.splice(this._bufferIndex);
-      this._state.set({ data: this._buffer });
+      // @todo - this is silly, just send a raw message
+      await this._state.set({ data: this._buffer });
+
       this._onPacketSendListeners.forEach(callback => callback());
     }
 

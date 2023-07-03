@@ -205,22 +205,23 @@ export default function(Plugin) {
       const name = state.get('name');
       // initialize the writer
       const writer = new WriterServer(state);
-      await writer.open();
-
       // clean state and storages when the writer is closed
-      writer.onClose = async () => {
+      writer.beforeClose = async () => {
+        // delete the state
+        await state.delete();
         // delete from internal list
         if (recordInList) {
           const list = this._internalState.get('list');
           delete list[name];
           await this._internalState.set({ list });
         }
-        // delete state
-        await state.delete();
+
         // remove from writers
         const writers = this._writers.get(nodeId);
         writers.delete(writer);
       };
+
+      await writer.open();
 
       // store writer in writers
       if (!this._writers.has(nodeId)) {
