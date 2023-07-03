@@ -39,10 +39,10 @@ export default function(Plugin) {
           allowReuse,
         });
 
+        let writer;
         // execute immediately as there may be concurrency issues with the server
         // `stateManager.observe` does not ganratee order of execution
         state.onUpdate(async updates => {
-          let writer;
 
           if ('cmd' in updates && updates.cmd !== null) {
             switch (updates.cmd) {
@@ -51,9 +51,9 @@ export default function(Plugin) {
                 resolve(writer);
                 break;
               }
-              // enable closing by the server
+              // enable closing by the server, i.e. in case of switch
               case 'close': {
-                writer.close();
+                await writer.close();
                 break;
               };
             }

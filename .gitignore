@@ -7,7 +7,10 @@ Thumbs.db
 
 # ...
 NOTES.md
-tests/logs
 TODOS.md
 
+.bak
 
+# test artifacts
+tests/logs
+tests/switch

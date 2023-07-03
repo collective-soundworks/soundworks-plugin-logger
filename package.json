@@ -30,6 +30,7 @@
   "homepage": "https://soundworks.dev",
   "dependencies": {
     "@ircam/sc-utils": "^1.1.1",
+    "@sindresorhus/slugify": "^2.2.1",
     "short-unique-id": "^4.4.4"
   },
   "devDependencies": {

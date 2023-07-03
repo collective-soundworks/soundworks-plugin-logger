@@ -4,7 +4,10 @@ import { assert } from 'chai';
 import { delay } from '@ircam/sc-utils';
 
 import { Server } from '@soundworks/core/server.js';
+import { Client } from '@soundworks/core/client.js';
+
 import pluginLoggerServer from '../src/PluginLoggerServer.js';
+import pluginLoggerClient from '../src/pluginLoggerClient.js';
 
 const config = {
   app: {
@@ -27,6 +30,10 @@ describe(`PluginLoggerServer`, () => {
   before(async () => {
     if (fs.existsSync('tests/logs')) {
       await fs.promises.rm('tests/logs', { recursive: true })
+    }
+
+    if (fs.existsSync('tests/switch')) {
+      await fs.promises.rm('tests/switch', { recursive: true })
     }
   });
 
@@ -438,6 +445,73 @@ describe(`PluginLoggerServer`, () => {
 
       await server.stop();
       fs.rmSync(writer.pathname);
+    });
+  });
+
+  describe.only('switch(dirnname)', () => {
+    it('should behave as expected', async () => {
+      const server = new Server(config);
+      server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
+      await server.start();
+      const serverLogger = await server.pluginManager.get('logger');
+
+      const client = new Client({ role: 'test', ...config });
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const clientLogger = await client.pluginManager.get('logger');
+
+      let serverOnCloseCalled = false;
+      let clientOnCloseCalled = false;
+      {
+        const serverWriter = await serverLogger.createWriter('server-switch-test-server');
+        serverWriter.onClose(() => serverOnCloseCalled = true);
+        const clientWriter = await clientLogger.createWriter('server-switch-test-client');
+        clientWriter.onClose(() => clientOnCloseCalled = true);
+      }
+
+      assert.equal(serverLogger._nodeIdWritersMap.size, 2);
+      assert.equal(serverLogger._pathnameWriterMap.size, 2);
+
+      await serverLogger.switch(null);
+      // the client writer.close is triggered from remote
+      await delay(100);
+
+      // on close methods have properly been called
+      assert.isTrue(serverOnCloseCalled);
+      assert.isTrue(clientOnCloseCalled);
+      // make sure all writers (and streams) have been closed, as this could not
+      // be the case for the server-side writer of the client instance.
+      // As writers are removed from the different maps in their `beforeClose`
+      // callbacks, we know all writers have been properly close server side too.
+      assert.equal(serverLogger._nodeIdWritersMap.size, 2);
+      serverLogger._nodeIdWritersMap.forEach(writers => {
+        assert.equal(writers.size, 0);
+      });
+      assert.equal(serverLogger._pathnameWriterMap.size, 0);
+
+      // switch to another lgo directory
+      await serverLogger.switch('tests/switch');
+
+      let serverWriter;
+      let clientWriter;
+
+      {
+        serverWriter = await serverLogger.createWriter('server-switch-test-server', {
+          usePrefix: false,
+        });
+        clientWriter = await clientLogger.createWriter('server-switch-test-client', {
+          usePrefix: false,
+        });
+      }
+
+      assert.equal(serverWriter.pathname, 'tests/switch/server-switch-test-server.txt');
+      assert.isTrue(fs.existsSync('tests/switch/server-switch-test-server.txt'));
+
+      assert.equal(clientWriter.pathname, 'tests/switch/server-switch-test-client.txt');
+      assert.isTrue(fs.existsSync('tests/switch/server-switch-test-client.txt'))
+
+      await client.stop();
+      await server.stop();
     });
   });
 });

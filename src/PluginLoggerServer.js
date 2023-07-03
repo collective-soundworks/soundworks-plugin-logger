@@ -134,7 +134,9 @@ export default function(Plugin) {
           // writer.open can throw too, e.g. file exists
           try {
             writer = await this._createAndRegisterWriter(nodeId, state);
-            state.onDetach(async () => await writer.close());
+            state.onDetach(async () => {
+              await writer.close()
+            });
           } catch (err) {
             state.set({ errored: err.message });
             return;
@@ -173,7 +175,6 @@ export default function(Plugin) {
     /** @private */
     async removeClient(client) {
       client.socket.removeAllListeners(`sw:plugin:${this.id}:data`);
-
       // delete all writers owned by this client
       // calling `close`` will clean the maps
       const writers = this._nodeIdWritersMap.get(client.id);
@@ -272,8 +273,17 @@ export default function(Plugin) {
 
     async switch(dirname) {
       // close all existing writers
-      // be carefull with flushing
+      for (let [nodeId, writers] of this._nodeIdWritersMap.entries()) {
+        for (let writer of writers) {
+          if (nodeId === this.server.id) {
+            await writer.close();
+          } else {
+            await writer._state.set({ cmd: 'close' });
+          }
+        }
+      }
 
+      // @todo - be carefull with flushing for now it will just be a "do what you can" startegy
       if (dirname !== null && !isString(dirname)) {
         throw new Error(`[soundworks:PluginLogger] Invalid option "dirname", should be string or null`);
       }
