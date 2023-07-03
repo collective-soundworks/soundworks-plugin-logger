@@ -315,7 +315,7 @@ describe(`PluginLoggerClient`, () => {
       const logger = await client.pluginManager.get('logger');
 
       {
-        const writer = await logger.createWriter('create_writer_allow_reuse', {
+        const writer = await logger.createWriter('create-writer-allow-reuse', {
           usePrefix: false,
           allowReuse: true,
         });
@@ -326,7 +326,7 @@ describe(`PluginLoggerClient`, () => {
       await delay(100);
 
       { // same server reuse file
-        const writer = await logger.createWriter('create_writer_allow_reuse', {
+        const writer = await logger.createWriter('create-writer-allow-reuse', {
           usePrefix: false,
           allowReuse: true,
         });
@@ -338,7 +338,7 @@ describe(`PluginLoggerClient`, () => {
 
       await delay(100);
 
-      const result = fs.readFileSync('tests/logs/create_writer_allow_reuse.txt').toString();
+      const result = fs.readFileSync('tests/logs/create-writer-allow-reuse.txt').toString();
       const expected = `a\nb\n`;
       assert.equal(result, expected);
 
@@ -349,7 +349,7 @@ describe(`PluginLoggerClient`, () => {
         await client.start();
         const logger = await client.pluginManager.get('logger');
 
-        const writer = await logger.createWriter('create_writer_allow_reuse', {
+        const writer = await logger.createWriter('create-writer-allow-reuse', {
           usePrefix: false,
           allowReuse: true,
         });
@@ -359,7 +359,7 @@ describe(`PluginLoggerClient`, () => {
         await delay(100);
         await client.stop();
 
-        const result = fs.readFileSync('tests/logs/create_writer_allow_reuse.txt').toString();
+        const result = fs.readFileSync('tests/logs/create-writer-allow-reuse.txt').toString();
         const expected = `a\nb\nc\n`;
         assert.equal(result, expected);
       }
