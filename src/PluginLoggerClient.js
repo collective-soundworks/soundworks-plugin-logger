@@ -30,11 +30,13 @@ export default function(Plugin) {
     async createWriter(name, {
       bufferSize = 1,
       usePrefix = true,
+      allowReuse = false
      } = {}) {
       return new Promise(async (resolve, reject) => {
         const state = await this.client.stateManager.create(`sw:plugin:${this.id}:writer`, {
           name,
           usePrefix,
+          allowReuse,
         });
 
         // execute immediately as there may be concurrency issues with the server

@@ -298,7 +298,7 @@ describe(`PluginLoggerClient`, () => {
       assert.isFalse('create-log' in serverLogger._internalState.get('list'));
     });
 
-    it(`should return a Writer - usePrefix=false`, async () => {
+    it(`usePrefix=false`, async () => {
       const client = new Client(config);
       client.pluginManager.register('logger', pluginLoggerClient);
       await client.start();
@@ -306,6 +306,63 @@ describe(`PluginLoggerClient`, () => {
       const writer = await logger.createWriter('create-log-no-prefix', { usePrefix: false });
 
       assert.equal(writer.pathname, 'tests/logs/create-log-no-prefix.txt');
+    });
+
+    it(`usePrefix=false, alllowReuse=true`, async () => {
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
+
+      {
+        const writer = await logger.createWriter('create_writer_allow_reuse', {
+          usePrefix: false,
+          allowReuse: true,
+        });
+        writer.write('a');
+        await writer.close();
+      }
+
+      await delay(100);
+
+      { // same server reuse file
+        const writer = await logger.createWriter('create_writer_allow_reuse', {
+          usePrefix: false,
+          allowReuse: true,
+        });
+        writer.write('b');
+        await writer.close();
+      }
+
+      await client.stop();
+
+      await delay(100);
+
+      const result = fs.readFileSync('tests/logs/create_writer_allow_reuse.txt').toString();
+      const expected = `a\nb\n`;
+      assert.equal(result, expected);
+
+      // // or whole new client
+      {
+        const client = new Client(config);
+        client.pluginManager.register('logger', pluginLoggerClient);
+        await client.start();
+        const logger = await client.pluginManager.get('logger');
+
+        const writer = await logger.createWriter('create_writer_allow_reuse', {
+          usePrefix: false,
+          allowReuse: true,
+        });
+        writer.write('c');
+        await writer.close();
+
+        await delay(100);
+        await client.stop();
+
+        const result = fs.readFileSync('tests/logs/create_writer_allow_reuse.txt').toString();
+        const expected = `a\nb\nc\n`;
+        assert.equal(result, expected);
+      }
     });
 
     it(`should propagete errors from the server`, async () => {

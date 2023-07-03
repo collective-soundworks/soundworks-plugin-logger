@@ -140,9 +140,10 @@ describe(`PluginLoggerServer`, () => {
     });
 
     // @note
-    // cleaning file here does not work as fs.rmSync doesn't seems to work
-    // while the writer has an opened file handle
-    // we need to give each time a different file name
+    //
+    // Cleaning the files here does not work as `fs.rmSync` doesn't seem to work
+    // while the writer has an opened file handle.
+    // The we need to give each time a different file name.
 
     it(`should return a Writer`, async () => {
       const server = new Server(config);
@@ -152,10 +153,9 @@ describe(`PluginLoggerServer`, () => {
       const writer = await logger.createWriter('default_options');
 
       assert.equal(writer.name, 'default_options');
-      // file is prefixed with date
+      // file is prefixed
       assert.equal(writer.pathname.startsWith('tests/logs/'), true);
       assert.equal(writer.pathname.endsWith('_default_options.txt'), true);
-
       assert.equal(fs.existsSync(writer.pathname), true);
 
       await server.stop();
@@ -169,40 +169,11 @@ describe(`PluginLoggerServer`, () => {
       const writer = await logger.createWriter('inner/create_writer_recursive');
 
       assert.equal(writer.name, 'inner/create_writer_recursive');
-      // file is prefixed with date
+      // file is prefixed
       assert.equal(writer.pathname.startsWith('tests/logs/inner/'), true);
       assert.equal(writer.pathname.endsWith('_create_writer_recursive.txt'), true);
 
       assert.equal(fs.existsSync(writer.pathname), true);
-
-      await server.stop();
-    });
-
-    it(`should return a Writer - usePrefix=false`, async () => {
-      const server = new Server(config);
-      server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
-      await server.start();
-      const logger = await server.pluginManager.get('logger');
-      const writer = await logger.createWriter('create_writer_no_prefix', { usePrefix: false });
-
-      assert.equal(writer.name, 'create_writer_no_prefix');
-      assert.equal(writer.pathname, 'tests/logs/create_writer_no_prefix.txt');
-      // file is not prefixed
-      assert.equal(fs.existsSync('tests/logs/create_writer_no_prefix.txt'), true);
-
-      await server.stop();
-    });
-
-    it(`should not override extension if given`, async () => {
-      const server = new Server(config);
-      server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
-      await server.start();
-      const logger = await server.pluginManager.get('logger');
-      const writer = await logger.createWriter('create_writer_keep_ext.md', { usePrefix: false });
-
-      assert.equal(writer.name, 'create_writer_keep_ext.md');
-      // file is not prefixed and extension is kept intact
-      assert.isTrue(fs.existsSync('tests/logs/create_writer_keep_ext.md'));
 
       await server.stop();
     });
@@ -223,6 +194,92 @@ describe(`PluginLoggerServer`, () => {
       await server.stop();
       // clean the file
       fs.rmSync(writer.pathname);
+    });
+
+    it(`should not override extension if given`, async () => {
+      const server = new Server(config);
+      server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
+      await server.start();
+      const logger = await server.pluginManager.get('logger');
+      const writer = await logger.createWriter('create_writer_keep_ext.md', { usePrefix: false });
+
+      assert.equal(writer.name, 'create_writer_keep_ext.md');
+      // file is not prefixed and extension is kept intact
+      assert.isTrue(fs.existsSync('tests/logs/create_writer_keep_ext.md'));
+
+      await server.stop();
+    });
+
+    it(`usePrefix=false`, async () => {
+      const server = new Server(config);
+      server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
+      await server.start();
+      const logger = await server.pluginManager.get('logger');
+      const writer = await logger.createWriter('create_writer_no_prefix', { usePrefix: false });
+
+      assert.equal(writer.name, 'create_writer_no_prefix');
+      assert.equal(writer.pathname, 'tests/logs/create_writer_no_prefix.txt');
+      // file is not prefixed
+      assert.equal(fs.existsSync('tests/logs/create_writer_no_prefix.txt'), true);
+
+      await server.stop();
+    });
+
+    it(`usePrefix=false, alllowReuse=true`, async () => {
+      const server = new Server(config);
+      server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
+      await server.start();
+      const logger = await server.pluginManager.get('logger');
+
+      {
+        const writer = await logger.createWriter('create_writer_allow_reuse', {
+          usePrefix: false,
+          allowReuse: true,
+        });
+        writer.write('a');
+        await writer.close();
+      }
+
+      await delay(100);
+
+      { // same server reuse file
+        const writer = await logger.createWriter('create_writer_allow_reuse', {
+          usePrefix: false,
+          allowReuse: true,
+        });
+        writer.write('b');
+        await writer.close();
+      }
+
+      await server.stop();
+
+      await delay(100);
+
+      const result = fs.readFileSync('tests/logs/create_writer_allow_reuse.txt').toString();
+      const expected = `a\nb\n`;
+      assert.equal(result, expected);
+
+      // or whole new server
+      {
+        const server = new Server(config);
+        server.pluginManager.register('logger', pluginLoggerServer, { dirname: 'tests/logs' });
+        await server.start();
+        const logger = await server.pluginManager.get('logger');
+
+        const writer = await logger.createWriter('create_writer_allow_reuse', {
+          usePrefix: false,
+          allowReuse: true,
+        });
+        writer.write('c');
+        await writer.close();
+
+        await delay(100);
+        await server.stop();
+
+        const result = fs.readFileSync('tests/logs/create_writer_allow_reuse.txt').toString();
+        const expected = `a\nb\nc\n`;
+        assert.equal(result, expected);
+      }
     });
   });
 

@@ -66,9 +66,14 @@ const writerSchema = {
     type: 'any',
     event: true,
   },
+  // options
   usePrefix: {
     type: 'boolean',
     default: true,
+  },
+  allowReuse: {
+    type: 'boolean',
+    default: false,
   },
   // propagate errors client-side
   errored: {
@@ -76,7 +81,7 @@ const writerSchema = {
     default: null,
     nullable: true,
   },
-
+  // commands for clients
   cmd: {
     type: 'string',
     default: null,
@@ -279,17 +284,23 @@ export default function(Plugin) {
      * @param {Object} options - Options for the writer
      * @param {Boolean} [usePrefix=true] - Whether the writer file should be prefixed
      *  with a `YYYY.MM.DD_hh.mm.ss_uid_` string.
+     * @param {Boolean} [allowReuse=false] - If `usePrefix` is false, allow to reuse an
+     *  existing underlying file for the writer. New data will be appended to the file.
+     *  Can be usefull to log global informations in the same file amongst different
+     *  sessions.
      */
-    // @todo - options
-    // - usePrefix=true
-    // - allowReuse=false (only is use prefix === false)
-    async createWriter(name, { usePrefix = true } = {}) {
+    async createWriter(name, {
+      usePrefix = true,
+      allowReuse = false,
+    } = {}) {
       const pathname = this._getPathname(name, usePrefix);
 
       // create underlying writer state
       const writerState = await this.server.stateManager.create(`sw:plugin:${this.id}:writer`, {
         name,
         pathname,
+        usePrefix,
+        allowReuse,
       });
 
       const writer = await this._createAndRegisterWriter(this.server.id, writerState, true);

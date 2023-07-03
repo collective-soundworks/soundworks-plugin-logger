@@ -73,18 +73,32 @@ class WriterServer {
       }
     }
 
+    const allowReuse = this._state.get('allowReuse');
+    const fileExists = fs.existsSync(this.pathname);
 
-    if (fs.existsSync(this.pathname)) {
+    if (fileExists && !allowReuse) {
       throw new Error(`[soudworks:PluginLogger] Error while creating writer "${this.name}", file already exists`);
-    } else {
-      await fs.promises.writeFile(this.pathname, '');
     }
 
-    // create stream source
     try {
-      // use synchronous API for nows
-      // @todo move to asynchronous
-      this._stream = fs.createWriteStream(this.pathname);
+      // https://nodejs.org/api/fs.html#file-system-flags
+      // - 'a': Open file for appending. The file is created if it does not exist.
+      // - `w`: Open file for writing. The file is created (if it does not exist)
+      //   or truncated (if it exists).
+      const options = {
+        flags: allowReuse ? 'a' : 'w',
+        mode: '644',
+        encoding : 'utf8',
+      };
+
+      // create the file before hand, mostly for testing purpose: `createWriteStream`
+      // does seem to create the underlying file until some data is written, or at
+      // least no synchronously...
+      if (!fileExists) {
+        await fs.promises.writeFile(this.pathname, '', options);
+      }
+      // @todo move to asynchronous API
+      this._stream = fs.createWriteStream(this.pathname, options);
     } catch (error) {
       throw new Error(`[soundworks:PluginLogger] Error while creating write stream for writer "${this.name}": ${error.message}`);
     }
