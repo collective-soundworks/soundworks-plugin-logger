@@ -1,6 +1,6 @@
-# `@soundworks/plugin-logger`
+# soundworks | plugin logger
 
-> [`soundworks`](https://github.com/collective-soundworks/soundworks) plugin dedicated to recording arbitrary from any node of the network into plain old files.
+[`soundworks`](https://github.com/collective-soundworks/soundworks) plugin for recording arbitrary data from any node of the network into plain old files.
 
 ## Table of Contents
 
