@@ -1,8 +1,17 @@
 import WriterClient from './WriterClient.js';
 
 export default function(Plugin) {
-
+  /**
+   * Client-side representation of the soundworks sync plugin.
+   */
   class PluginLoggerClient extends Plugin {
+    /**
+     * The constructor should never be called manually. The plugin will be
+     * instantiated by soundworks when registered in the `pluginManager`
+     *
+     * @example
+     * client.pluginManager.register('logger', pluginLogger);
+     */
     constructor(client, id, options) {
       super(client, id);
 
@@ -26,15 +35,18 @@ export default function(Plugin) {
     }
 
     /**
-     * Create a writer
-     * @param {String} name - Name of the writer.
+     * Create a writer.
+     *
+     * @param {String} name - Name of the writer. Used to generate the log file
+     *  pathname.
      * @param {Object} options - Options for the writer.
-     * @param {Number} [bufferSize=1] - Number of writes buffered before sending
-     *  the logs to the server.
-     * @param {Boolean} [usePrefix=true] - Whether the writer file should be prefixed
-     *  with a `YYYY.MM.DD_hh.mm.ss_uid_` string.
-     * @param {Boolean} [allowReuse=false] - If `usePrefix` is false, allow to reuse an
-     *  existing underlying file for the writer. New data will be appended to the file.
+     * @param {Number} [options.bufferSize=1] - Number of writes buffered before
+     *  sending the logs to the server.
+     * @param {Boolean} [options.usePrefix=true] - Whether the writer file should
+     *  be prefixed with a `YYYY.MM.DD_hh.mm.ss_uid_` string.
+     * @param {Boolean} [options.allowReuse=false] - If `usePrefix` is false, allow
+     *  to reuse an existing underlying file for the writer. New data will be
+     *  appended to the file.
      *  Can be usefull to log global informations in the same file amongst different
      *  sessions.
      */
@@ -86,10 +98,12 @@ export default function(Plugin) {
     /**
      * Attach to a shared writer created by the server. Can be usefull to create
      * files that gather informations from multiple nodes.
-     * @param {String} name - Name of the writer.
+     *
+     * @param {String} name - Name of the writer. Used to generate the log file
+     *  pathname.
      * @param {Object} options - Options for the writer.
-     * @param {Number} [bufferSize=1] - Number of writes buffered before sending
-     *  the logs to the server.
+     * @param {Number} [options.bufferSize=1] - Number of writes buffered before
+     *  sending the logs to the server.
      */
     async attachWriter(name, { bufferSize = 1 } = {}) {
       const list = this._internalState.get('list');

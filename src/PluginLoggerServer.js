@@ -14,7 +14,6 @@ const ids = idGenerator();
  * @param {String} radical
  * @returns {String} concatenation of prefix + radical, sliced to the minimum of
  *  the prefix or radical size. (@note - this is not true)
- *
  * @private
  */
 function pad(prefix, radical) {
@@ -85,11 +84,26 @@ const writerSchema = {
   },
 };
 
-// keep a list of the writers create by the server
-
 export default function(Plugin) {
-
+  /**
+   * Server-side representation of the soundworks logger plugin.
+   */
   class PluginLoggerServer extends Plugin {
+    /**
+     * The constructor should never be called manually. The plugin will be
+     * instantiated by soundworks when registered in the `pluginManager`
+     *
+     * Available options:
+     * - `[dirname=null]` {String} - The directory in which the log files should
+     *  be created. If `null` the plugin is in some "idle" state, and any call
+     *  to `createWriter` (or client-side `attachWriter`) will throw an error.
+     *  The directory can be changed at runtime usin the `switch` method.
+     *
+     * @example
+     * server.pluginManager.register('logger', pluginLogger, {
+     *   dirname: 'my-logs',
+     * });
+     */
     constructor(server, id, options) {
       super(server, id);
 
@@ -263,18 +277,11 @@ export default function(Plugin) {
     }
 
     /**
-     * Helper that just return a string of yyyymmdd to help naming directories
-     */
-    // getDatedPrefix() {
-    //   // @todo
-    // }
-
-    /**
-     * Switch the plugin to use another directory. Closes all existing writers.
+     * Change the directory in which the log files are created. Closes all existing writers.
      *
      * @param {String|Object} dirname - Path to the new directory. As a convenience
      *  to match the plugin filesystem API, an object containing the 'dirname' key
-     *  can also be passed
+     *  can also be passed.
      */
     async switch(dirname) {
       // support switch({ dirname }) API to match filesystem API
@@ -318,13 +325,15 @@ export default function(Plugin) {
     }
 
     /**
-     * Create a writer
-     * @param {String} name - Name of the writer
-     * @param {Object} options - Options for the writer
-     * @param {Boolean} [usePrefix=true] - Whether the writer file should be prefixed
-     *  with a `YYYY.MM.DD_hh.mm.ss_uid_` string.
-     * @param {Boolean} [allowReuse=false] - If `usePrefix` is false, allow to reuse an
-     *  existing underlying file for the writer. New data will be appended to the file.
+     * Create a writer.
+     * @param {String} name - Name of the writer. Used to generate the log file
+     *  pathname.
+     * @param {Object} options - Options for the writer.
+     * @param {Boolean} [options.usePrefix=true] - Whether the writer file should
+     *  be prefixed with a `YYYY.MM.DD_hh.mm.ss_uid_` string.
+     * @param {Boolean} [options.allowReuse=false] - If `usePrefix` is false, allow
+     *  to reuse an existing underlying file for the writer. New data will be
+     *  appended to the file.
      *  Can be usefull to log global informations in the same file amongst different
      *  sessions.
      */
