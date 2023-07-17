@@ -1,5 +1,7 @@
 # soundworks | plugin logger
 
+[![npm version](https://badge.fury.io/js/@soundworks%2Fplugin-logger.svg)](https://badge.fury.io/js/@soundworks%2Fplugin-logger)
+
 [`soundworks`](https://github.com/collective-soundworks/soundworks) plugin for recording arbitrary data from any node of the network into plain old files.
 
 ## Table of Contents
