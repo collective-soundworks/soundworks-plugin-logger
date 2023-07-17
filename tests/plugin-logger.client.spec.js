@@ -387,7 +387,7 @@ describe(`PluginLoggerClient`, () => {
       }
     });
 
-    it(`should propagete errors from the server`, async () => {
+    it(`should propagate errors from the server`, async () => {
       fs.writeFileSync('tests/logs/file-exists.txt', '');
 
       const client = new Client(config);
@@ -407,6 +407,8 @@ describe(`PluginLoggerClient`, () => {
       if (!errored) {
         assert.fail('should have failed');
       }
+
+      await delay(100);
     });
   });
 
@@ -567,8 +569,7 @@ describe(`PluginLoggerClient`, () => {
 
       await writer.close();
       // delay(100); // not sure we can rely on this consecutive appearence
-
-      assert.equal(serverLogger._nodeIdWritersMap.get(client.id).size, 0);
+      assert.isFalse(serverLogger._nodeIdWritersMap.has(client.id));
     });
   });
 
@@ -601,7 +602,25 @@ describe(`PluginLoggerClient`, () => {
       fs.rmSync(writer.pathname);
     });
   });
+
+  describe(`# client.disconnect should clean the writers`, () => {
+    it(`writers should be cleaned if client disconnects`, async () => {
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
+      const writer = await logger.createWriter('client-disconnect');
+
+      await delay(100);
+
+      await client.stop();
+      await delay(100);
+
+      assert.isFalse(serverLogger._nodeIdWritersMap.has(client.id));
+    });
+  });
 });
+
 
 
 

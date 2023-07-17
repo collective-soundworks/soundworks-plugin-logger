@@ -169,7 +169,13 @@ export default function(Plugin) {
 
         // remove from writers from the different maps
         this._pathnameWriterMap.delete(writer.pathname);
-        this._nodeIdWritersMap.get(nodeId).delete(writer);
+
+        const writers = this._nodeIdWritersMap.get(nodeId);
+        writers.delete(writer);
+        // clean map entry if no writer left
+        if (writers.size === 0) {
+          this._nodeIdWritersMap.delete(nodeId);
+        }
       };
 
       await writer.open();
@@ -222,9 +228,9 @@ export default function(Plugin) {
           // writer.open can throw too, e.g. file exists
           try {
             writer = await this._createAndRegisterWriter(nodeId, state);
-            state.onDetach(async () => {
-              await writer.close()
-            });
+            // if creating the writers fails, the onDetach callback is never
+            // registers, so we are ko
+            state.onDetach(async () => await writer.close());
           } catch (err) {
             state.set({ errored: err.message });
             return;
@@ -262,17 +268,8 @@ export default function(Plugin) {
 
     /** @private */
     async removeClient(client) {
+      // @note - writers owned by the client are deleted thourhg the state.onDetach
       client.socket.removeAllListeners(`sw:plugin:${this.id}:data`);
-      // delete all writers owned by this client
-      // calling `close`` will clean the maps
-      const writers = this._nodeIdWritersMap.get(client.id);
-      // await so that close don't try to acces an empty this._nodeIdWritersMap set
-      for (let writer of writers) {
-        await writer.close();
-      }
-
-      this._nodeIdWritersMap.delete(client.id);
-
       await super.removeClient();
     }
 

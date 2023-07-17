@@ -411,7 +411,8 @@ describe(`PluginLoggerServer`, () => {
       // should resolve once the writer is close
       const list = logger._internalState.get('list');
       assert.isUndefined(list['server-test-close']);
-      assert.isFalse(logger._nodeIdWritersMap.get(server.id).has(writer));
+      // map has been cleaned
+      assert.isFalse(logger._nodeIdWritersMap.has(server.id));
 
       await server.stop();
       fs.rmSync(writer.pathname);
@@ -497,10 +498,7 @@ describe(`PluginLoggerServer`, () => {
       // be the case for the server-side writer of the client instance.
       // As writers are removed from the different maps in their `beforeClose`
       // callbacks, we know all writers have been properly close server side too.
-      assert.equal(serverLogger._nodeIdWritersMap.size, 2);
-      serverLogger._nodeIdWritersMap.forEach(writers => {
-        assert.equal(writers.size, 0);
-      });
+      assert.equal(serverLogger._nodeIdWritersMap.size, 0);
       assert.equal(serverLogger._pathnameWriterMap.size, 0);
 
       // switch to another lgo directory

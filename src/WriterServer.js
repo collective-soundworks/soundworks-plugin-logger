@@ -130,7 +130,7 @@ class WriterServer {
    * @returns {Promise} Promise that resolves when the stream is closed
    */
   async close() {
-    // clean state and everything before actually closing the stream
+    // clean maps before actually closing the stream
     await this.beforeClose();
     // if the writer has been created by the server, delete the state
     if (this._state.isOwner) {

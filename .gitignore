@@ -14,3 +14,4 @@ TODOS.md
 # test artifacts
 tests/logs
 tests/switch
+tests/browser-test
