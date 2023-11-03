@@ -195,6 +195,40 @@ describe(`PluginLoggerClient`, () => {
     });
   });
 
+  describe(`# [attached] WriterClient.flush()`, () => {
+    it(`should be able to write to attached writer`, async () => {
+      await serverLogger.createWriter('attached-log-flush');
+
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
+
+      const writer = await logger.attachWriter('attached-log-flush', { bufferSize: 3 });
+      writer.write('a');
+      writer.flush();
+
+      await delay(100);
+
+      {
+        const content = fs.readFileSync(writer.pathname).toString();
+        const expected = `a\n`;
+        assert.equal(content, expected);
+      }
+
+      writer.write('b');
+      writer.flush();
+
+      await delay(100);
+
+      {
+        const content = fs.readFileSync(writer.pathname).toString();
+        const expected = `a\nb\n`;
+        assert.equal(content, expected);
+      }
+    });
+  });
+
   describe(`# [attached] await WriterClient.close()`, () => {
     it(`should close the writer`, async () => {
       await serverLogger.createWriter('attached-simple-close');
@@ -506,6 +540,38 @@ describe(`PluginLoggerClient`, () => {
       {
         const content = fs.readFileSync(serverWriter.pathname).toString();
         const expected = `c\n`;
+        assert.equal(content, expected);
+      }
+    });
+  });
+
+  describe(`# [created] WriterClient.flush()`, () => {
+    it(`should be able to write to attached writer`, async () => {
+      const client = new Client(config);
+      client.pluginManager.register('logger', pluginLoggerClient);
+      await client.start();
+      const logger = await client.pluginManager.get('logger');
+
+      const writer = await logger.createWriter('create-log-flush', { bufferSize: 3 });
+      writer.write('a');
+      writer.flush();
+
+      await delay(100);
+
+      {
+        const content = fs.readFileSync(writer.pathname).toString();
+        const expected = `a\n`;
+        assert.equal(content, expected);
+      }
+
+      writer.write('b');
+      writer.flush();
+
+      await delay(100);
+
+      {
+        const content = fs.readFileSync(writer.pathname).toString();
+        const expected = `a\nb\n`;
         assert.equal(content, expected);
       }
     });

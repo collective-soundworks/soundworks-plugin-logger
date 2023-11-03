@@ -126,7 +126,7 @@ class WriterServer {
   }
 
   /**
-   * Close the stream,
+   * Close the writer and the underlying stream.
    * @returns {Promise} Promise that resolves when the stream is closed
    */
   async close() {

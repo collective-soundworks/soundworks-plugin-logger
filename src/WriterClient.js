@@ -31,14 +31,29 @@ class WriterClient {
     });
   }
 
+  /**
+   * Name of the Writer.
+   * @readonly
+   */
   get name() {
     return this._state.get('name');
   }
 
+  /**
+   * Pathname of the Writer.
+   * @readonly
+   */
   get pathname() {
     return this._state.get('pathname');
   }
 
+  /**
+   * Format and write data.
+   * - Successive write calls are added to a new line
+   * - Data can be of any type, it will be stringified before write.
+   * - TypedArrays are converted to Array before being stringified.
+   * @param {Any} data - Data to be written
+   */
   write(data) {
     // avoid concurrency / write after end issues
     if (this._closed) {
@@ -61,18 +76,35 @@ class WriterClient {
     }
   }
 
-  async close() {
-    this._closed = true;
-
+  /**
+   * Flush the buffer, only applies if `bufferSize` option is set.
+   */
+  flush() {
     // flush remaining buffered data
     if (this._bufferSize > 1 && this._bufferIndex > 0) {
-      this._buffer.splice(this._bufferIndex);
+      const copy = new Array(this.bufferSize);
 
-      const msg = { pathname: this.pathname, data: this._buffer };
+      for (let i = 0; i < this._bufferIndex; i++) {
+        copy[i] = this._buffer[i];
+      }
+
+      this._bufferIndex = 0; // reset buffer index
+
+      const msg = { pathname: this.pathname, data: copy };
       this._plugin.client.socket.send(this._sendChannel, msg);
 
       this._onPacketSendCallbacks.forEach(callback => callback());
     }
+  }
+
+  /**
+   * Close the writer.
+   * @returns {Promise} Promise that resolves when the stream is closed
+   */
+  async close() {
+    this._closed = true;
+
+    this.flush();
 
     if (this._state.isOwner) {
       await this._state.delete();
