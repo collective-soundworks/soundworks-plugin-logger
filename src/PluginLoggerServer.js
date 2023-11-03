@@ -41,7 +41,8 @@ function prefix() {
   // more robust than using millisesconds which could eventually be the same
   const id = pad('0000', ids.next().value);
 
-  return `${year}.${month}.${day}_${hours}.${minutes}.${seconds}_${id}_`;
+  // cf. https://github.com/collective-soundworks/soundworks-plugin-logger/issues/2
+  return `${year}${month}${day}-${hours}${minutes}${seconds}-${id}_`;
 }
 
 const internalSchema = {

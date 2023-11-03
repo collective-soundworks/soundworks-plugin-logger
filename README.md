@@ -96,7 +96,7 @@ console.log(writer.pathname);
 ### Prefix in log files
 
 By default all log files (client-side and server-side) are prefixed following a format: `yyyy.mm.dd_hh.mm.ss_id_${basename}`. This behavior can be turned of
-by seeting the `uesPrefix` option to false when creating a writer.
+by seeting the `usePrefix` option to false when creating a writer.
 
 With `usePrefix = true` (default):
 
@@ -109,7 +109,7 @@ console.log(writer.pathname);
 With `usePrefix = false`:
 
 ```js
-const writer = await logger.createWriter('my-log.txt');
+const writer = await logger.createWriter('my-log.txt', { usePrefix: false });
 console.log(writer.pathname);
 > 'logs/my-log.txt';
 ``` 
