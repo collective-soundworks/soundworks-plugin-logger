@@ -156,7 +156,7 @@ class WriterServer {
    * will be executed when the underlying stream is closed and before the `close()`
    * Promise is resolved.
    * @param {Function} callback - Function to execute on close.
-   * @returns Function that unregister the listener when executed.
+   * @returns {Function} that unregister the listener when executed.
    */
   onClose(callback) {
     this._onCloseCallbacks.add(callback);

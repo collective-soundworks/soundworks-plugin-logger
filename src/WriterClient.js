@@ -117,7 +117,7 @@ class WriterClient {
    * Register a function to be executed when a packet is sent on the network.,
    * i.e. when the buffer is full or flushed on close.
    * @param {Function} callback - Function to execute on close.
-   * @returns Function that unregister the listener when executed.
+   * @returns {Function} that unregister the listener when executed.
    */
   onPacketSend(callback) {
     this._onPacketSendCallbacks.add(callback);
@@ -129,7 +129,7 @@ class WriterClient {
    * will be executed after the buffer has been flushed and underlying state has
    * been deleted, and before the `close` Promise resolves.
    * @param {Function} callback - Function to execute on close.
-   * @returns Function that unregister the listener when executed.
+   * @returns {Function} that unregister the listener when executed.
    */
   onClose(callback) {
     this._onCloseCallbacks.add(callback);
