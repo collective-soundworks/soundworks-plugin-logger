@@ -6,15 +6,18 @@ import { delay } from '@ircam/sc-utils';
 import { Server } from '@soundworks/core/server.js';
 import { Client } from '@soundworks/core/client.js';
 
-import pluginLoggerServer from '../src/PluginLoggerServer.js';
-import pluginLoggerClient from '../src/pluginLoggerClient.js';
+import ServerPluginLogger, {
+  kNodeIdWritersMap,
+  kInternalState,
+} from '../src/ServerPluginLogger.js';
+import ClientPluginLogger from '../src/ClientPluginLogger.js';
 
 const config = {
   app: {
     name: 'test-plugin-logger',
     clients: {
       test: {
-        target: 'node',
+        runtime: 'node',
       },
     },
   },
@@ -27,7 +30,7 @@ const config = {
   role: 'test',
 };
 
-describe(`PluginLoggerClient`, () => {
+describe(`ClientPluginLogger`, () => {
   before(async () => {
     if (fs.existsSync('tests/logs')) {
       await fs.promises.rm('tests/logs', { recursive: true });
@@ -39,8 +42,8 @@ describe(`PluginLoggerClient`, () => {
 
   beforeEach(async () => {
     server = new Server(config);
-    server.pluginManager.register('logger', pluginLoggerServer, {
-      dirname: 'tests/logs'
+    server.pluginManager.register('logger', ServerPluginLogger, {
+      dirname: 'tests/logs',
     });
 
     await server.start();
@@ -54,9 +57,9 @@ describe(`PluginLoggerClient`, () => {
   describe(`# plugin registration`, () => {
     it(`should properly register`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
-      const logger = await client.pluginManager.get('logger');
+      await client.pluginManager.get('logger');
 
       assert.equal(true, true);
     });
@@ -65,14 +68,14 @@ describe(`PluginLoggerClient`, () => {
   describe(`# async attachWriter(name)`, () => {
     it(`should throw if writer has not been created by the server`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
 
       let errored = false;
 
       try {
-        const writer = await logger.attachWriter('global-log');
+        await logger.attachWriter('global-log');
       } catch (err) {
         console.log(err.message);
         errored = true;
@@ -87,7 +90,7 @@ describe(`PluginLoggerClient`, () => {
       await serverLogger.createWriter('global-log');
 
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
 
@@ -103,7 +106,7 @@ describe(`PluginLoggerClient`, () => {
       await serverLogger.createWriter('attach-global-log');
 
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
 
@@ -130,7 +133,7 @@ describe(`PluginLoggerClient`, () => {
 
       {
         const client = new Client(config);
-        client.pluginManager.register('logger', pluginLoggerClient);
+        client.pluginManager.register('logger', ClientPluginLogger);
         await client.start();
         const logger = await client.pluginManager.get('logger');
         writer1 = await logger.attachWriter('share-global-log');
@@ -138,7 +141,7 @@ describe(`PluginLoggerClient`, () => {
 
       {
         const client = new Client(config);
-        client.pluginManager.register('logger', pluginLoggerClient);
+        client.pluginManager.register('logger', ClientPluginLogger);
         await client.start();
         const logger = await client.pluginManager.get('logger');
         writer2 = await logger.attachWriter('share-global-log');
@@ -166,7 +169,7 @@ describe(`PluginLoggerClient`, () => {
       await serverLogger.createWriter('buffer-global-log');
 
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
       // values will be written after 5th call to write
@@ -200,7 +203,7 @@ describe(`PluginLoggerClient`, () => {
       await serverLogger.createWriter('attached-log-flush');
 
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
 
@@ -234,7 +237,7 @@ describe(`PluginLoggerClient`, () => {
       await serverLogger.createWriter('attached-simple-close');
 
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
       // values will be written after 5th call to write
@@ -244,7 +247,7 @@ describe(`PluginLoggerClient`, () => {
       await writer.close();
       await delay(100);
 
-      writer.write('b'); // this should silentely fail
+      writer.write('b'); // this should silently fail
       await delay(100);
 
       const content = fs.readFileSync(writer.pathname).toString();
@@ -256,7 +259,7 @@ describe(`PluginLoggerClient`, () => {
       await serverLogger.createWriter('attached-flush-close');
 
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
       // values will be written after 5th call to write
@@ -285,7 +288,7 @@ describe(`PluginLoggerClient`, () => {
 
       {
         const client = new Client(config);
-        client.pluginManager.register('logger', pluginLoggerClient);
+        client.pluginManager.register('logger', ClientPluginLogger);
         await client.start();
         const logger = await client.pluginManager.get('logger');
         // values will be written after 5th call to write
@@ -298,7 +301,7 @@ describe(`PluginLoggerClient`, () => {
 
       {
         const client = new Client(config);
-        client.pluginManager.register('logger', pluginLoggerClient);
+        client.pluginManager.register('logger', ClientPluginLogger);
         await client.start();
         const logger = await client.pluginManager.get('logger');
         // values will be written after 5th call to write
@@ -322,7 +325,7 @@ describe(`PluginLoggerClient`, () => {
       const serverWriter = await serverLogger.createWriter('attached-owner-close');
 
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
 
@@ -343,20 +346,20 @@ describe(`PluginLoggerClient`, () => {
   describe(`# async createWriter(name) -> WriterClient`, () => {
     it(`should return a Writer`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
 
-      const writer = await logger.createWriter('create-log');
+      await logger.createWriter('create-log');
 
       // should be in writers but not in the global list
-      assert.equal(serverLogger._nodeIdWritersMap.get(client.id).size, 1);
-      assert.isFalse('create-log' in serverLogger._internalState.get('list'));
+      assert.equal(serverLogger[kNodeIdWritersMap].get(client.id).size, 1);
+      assert.isFalse('create-log' in serverLogger[kInternalState].get('list'));
     });
 
     it(`usePrefix=false`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
       const writer = await logger.createWriter('create-log-no-prefix', { usePrefix: false });
@@ -366,7 +369,7 @@ describe(`PluginLoggerClient`, () => {
 
     it(`usePrefix=false, alllowReuse=true`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
 
@@ -401,7 +404,7 @@ describe(`PluginLoggerClient`, () => {
       // // or whole new client
       {
         const client = new Client(config);
-        client.pluginManager.register('logger', pluginLoggerClient);
+        client.pluginManager.register('logger', ClientPluginLogger);
         await client.start();
         const logger = await client.pluginManager.get('logger');
 
@@ -425,22 +428,20 @@ describe(`PluginLoggerClient`, () => {
       fs.writeFileSync('tests/logs/file-exists.txt', '');
 
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
 
       let errored = false;
 
       try {
-        const writer = await logger.createWriter('file-exists.txt', { usePrefix: false });
-      } catch(err) {
+        await logger.createWriter('file-exists.txt', { usePrefix: false });
+      } catch (err) {
         console.log(err.message);
         errored = true;
       }
 
-      if (!errored) {
-        assert.fail('should have failed');
-      }
+      assert.isTrue(errored);
 
       await delay(100);
     });
@@ -449,7 +450,7 @@ describe(`PluginLoggerClient`, () => {
   describe(`# [created] Writer.write(name)`, () => {
     it(`should log values`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
 
@@ -469,7 +470,7 @@ describe(`PluginLoggerClient`, () => {
 
     it(`should take given buffer size into account`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
 
@@ -504,7 +505,7 @@ describe(`PluginLoggerClient`, () => {
 
       {
         const client = new Client(config);
-        client.pluginManager.register('logger', pluginLoggerClient);
+        client.pluginManager.register('logger', ClientPluginLogger);
         await client.start();
         const logger = await client.pluginManager.get('logger');
         // values will be written after 5th call to write
@@ -514,7 +515,7 @@ describe(`PluginLoggerClient`, () => {
 
       {
         const client = new Client(config);
-        client.pluginManager.register('logger', pluginLoggerClient);
+        client.pluginManager.register('logger', ClientPluginLogger);
         await client.start();
         const logger = await client.pluginManager.get('logger');
         // values will be written after 5th call to write
@@ -548,7 +549,7 @@ describe(`PluginLoggerClient`, () => {
   describe(`# [created] WriterClient.flush()`, () => {
     it(`should be able to write to attached writer`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
 
@@ -580,7 +581,7 @@ describe(`PluginLoggerClient`, () => {
   describe(`# [created] async Writer.close()`, () => {
     it(`should close the writer`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
       // values will be written after 5th call to write
@@ -599,7 +600,7 @@ describe(`PluginLoggerClient`, () => {
 
     it(`should flush the buffer`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
       // values will be written after 5th call to write
@@ -627,22 +628,22 @@ describe(`PluginLoggerClient`, () => {
 
     it(`should be cleaned out server side`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
       // values will be written after 5th call to write
       const writer = await logger.createWriter('create-log-close-clean');
 
       await writer.close();
-      // delay(100); // not sure we can rely on this consecutive appearence
-      assert.isFalse(serverLogger._nodeIdWritersMap.has(client.id));
+      // delay(100); // not sure we can rely on this consecutive appearance
+      assert.isFalse(serverLogger[kNodeIdWritersMap].has(client.id));
     });
   });
 
   describe(`# Writer.onClose(callback)`, () => {
     it(`should have consistent order of execution`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
       const writer = await logger.createWriter('server-test-onclose');
@@ -672,17 +673,16 @@ describe(`PluginLoggerClient`, () => {
   describe(`# client.disconnect should clean the writers`, () => {
     it(`writers should be cleaned if client disconnects`, async () => {
       const client = new Client(config);
-      client.pluginManager.register('logger', pluginLoggerClient);
+      client.pluginManager.register('logger', ClientPluginLogger);
       await client.start();
       const logger = await client.pluginManager.get('logger');
-      const writer = await logger.createWriter('client-disconnect');
+      await logger.createWriter('client-disconnect');
 
       await delay(100);
-
       await client.stop();
       await delay(100);
 
-      assert.isFalse(serverLogger._nodeIdWritersMap.has(client.id));
+      assert.isFalse(serverLogger[kNodeIdWritersMap].has(client.id));
     });
   });
 });

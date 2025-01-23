@@ -8,14 +8,16 @@
   "license": "BSD-3-Clause",
   "type": "module",
   "exports": {
-    "./client.js": "./src/PluginLoggerClient.js",
-    "./server.js": "./src/PluginLoggerServer.js"
+    "./client.js": "./src/ClientPluginLogger.js",
+    "./server.js": "./src/ServerPluginLogger.js"
   },
   "scripts": {
     "api": "jsdoc-to-readme --src src/*.js",
     "preversion": "npm run api && npm run toc && git commit -am 'docs: build' --allow-empty",
-    "test": "mocha",
-    "toc": "markdown-toc -i README.md --maxdepth 3"
+    "test": "mocha tests/*.spec.js",
+    "test:only": "mocha",
+    "lint": "npx eslint src tests/*.spec.js",
+    "toc": "markdown-toc -i README.md --maxdepth 2"
   },
   "publishConfig": {
     "access": "public"
@@ -30,14 +32,16 @@
   "homepage": "https://soundworks.dev",
   "dependencies": {
     "@ircam/sc-utils": "^1.1.1",
-    "@sindresorhus/slugify": "^2.2.1",
-    "short-unique-id": "^4.4.4"
+    "@sindresorhus/slugify": "^2.2.1"
   },
   "devDependencies": {
-    "@soundworks/core": "^4.0.0-alpha.7",
-    "chai": "^4.3.6",
-    "jsdoc-to-readme": "^1.1.0",
+    "@ircam/eslint-config": "^2.0.1",
+    "chai": "^5.1.2",
+    "jsdoc-to-readme": "^2.0.2",
     "markdown-toc": "^1.2.0",
-    "mocha": "^10.1.0"
+    "mocha": "^11.1.0"
+  },
+  "peerDependencies": {
+    "@soundworks/core": "^4.0.0-alpha.7"
   }
 }

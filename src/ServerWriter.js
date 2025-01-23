@@ -4,25 +4,38 @@ import os from 'node:os';
 
 import { isFunction, isString, isTypedArray } from '@ircam/sc-utils';
 
+export const kWriterBeforeCloseCallback = Symbol('plugin:logger:server-writer:before-close-callback');
+export const kWriterStream = Symbol('plugin:logger:server-writer:stream');
+export const kWriterState = Symbol('plugin:logger:server-writer:state');
+
 /**
  * Server-side stream writer.
  *
- * Created and retrived by the server-side `logger.createWriter(name)` method.
+ * Created and retrieved by the server-side `logger.createWriter(name)` method.
  */
-class WriterServer {
-  // @note - do not document as JSDoc, we don't want that to appear in the doc, and
-  // marking as @private would make the whole class disappear from the generated doc.
-  //
-  // @param {SharedState} state - Shared state associated to the writer.
-  // @throws {Error} Can throw when creating the directory or the file
+export default class ServerWriter {
+  #format = null;
+  #onCloseCallbacks = new Set();
+
+  /** hideconstructor */
   constructor(state, format = null) {
-    this._state = state;
+    this[kWriterState] = state;
+
+    /**
+     * Protected function executed at the beginning of `close()`. Declared by the
+     * logger for bookkeeping.
+     * @type Function
+     * @private
+     */
+    this[kWriterBeforeCloseCallback] = null;
+    // protected for testing
+    this[kWriterStream] = null;
 
     // Do not document `format` for now, let's see if we really need this option...
     if (isFunction(format)) {
-      this._format = format;
+      this.#format = format;
     } else {
-      this._format = message => {
+      this.#format = message => {
         // If binary array given convert to simple array before stringify
         if (isTypedArray(message)) {
           message = Array.from(message);
@@ -40,16 +53,6 @@ class WriterServer {
         return `${message}${os.EOL}`;
       };
     }
-
-    this._stream = null;
-    this._onCloseCallbacks = new Set();
-    /**
-     * Protected function executed at the beginning of `close()`. Declared by the
-     * logger for bookkeeping.
-     * @type Function
-     * @private
-     */
-    this.beforeClose = null;
   }
 
   /**
@@ -57,7 +60,7 @@ class WriterServer {
    * @readonly
    */
   get name() {
-    return this._state.get('name');
+    return this[kWriterState].get('name');
   }
 
   /**
@@ -65,7 +68,7 @@ class WriterServer {
    * @readonly
    */
   get pathname() {
-    return this._state.get('pathname');
+    return this[kWriterState].get('pathname');
   }
 
   // is actually protected
@@ -76,16 +79,16 @@ class WriterServer {
     if (!fs.existsSync(dirname)) {
       try {
         await fs.promises.mkdir(dirname, { recursive: true });
-      } catch(error) {
-        throw new Error(`[soudworks:PluginLogger] Error while creating directory ${dirname} for writer "${this.name}": ${error.message}`);
+      } catch (error) {
+        throw new Error(`Cannot execute 'open' on ServerWriter: Error while creating directory '${dirname}' for writer '${this.name}': ${error.message}`);
       }
     }
 
-    const allowReuse = this._state.get('allowReuse');
+    const allowReuse = this[kWriterState].get('allowReuse');
     const fileExists = fs.existsSync(this.pathname);
 
     if (fileExists && !allowReuse) {
-      throw new Error(`[soudworks:PluginLogger] Error while creating writer "${this.name}", file already exists`);
+      throw new Error(`Cannot execute 'open' on ServerWriter: Error while creating writer '${this.name}', file already exists`);
     }
 
     try {
@@ -106,9 +109,9 @@ class WriterServer {
         await fs.promises.writeFile(this.pathname, '', options);
       }
       // @todo move to asynchronous API
-      this._stream = fs.createWriteStream(this.pathname, options);
+      this[kWriterStream] = fs.createWriteStream(this.pathname, options);
     } catch (error) {
-      throw new Error(`[soundworks:PluginLogger] Error while creating write stream for writer "${this.name}": ${error.message}`);
+      throw new Error(`Cannot execute 'open' on ServerWriter: Error while creating write stream for writer '${this.name}': ${error.message}`);
     }
   }
 
@@ -120,8 +123,8 @@ class WriterServer {
    * @param {Any} data - Data to be written
    */
   write(data) {
-    if (this._stream.writable) {
-      this._stream.write(this._format(data));
+    if (this[kWriterStream].writable) {
+      this[kWriterStream].write(this.#format(data));
     }
   }
 
@@ -131,23 +134,23 @@ class WriterServer {
    */
   async close() {
     // clean maps before actually closing the stream
-    await this.beforeClose();
+    await this[kWriterBeforeCloseCallback]();
     // if the writer has been created by the server, delete the state
-    if (this._state.isOwner) {
-      await this._state.delete();
+    if (this[kWriterState].isOwner) {
+      await this[kWriterState].delete();
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, _) => {
       // wait for the stream close event
-      this._stream.on('close', async () => {
-        for (let callback of this._onCloseCallbacks) {
+      this[kWriterStream].on('close', async () => {
+        for (let callback of this.#onCloseCallbacks) {
           await callback();
         }
 
         resolve();
       });
 
-      this._stream.end();
+      this[kWriterStream].end();
     });
   }
 
@@ -159,9 +162,7 @@ class WriterServer {
    * @returns {Function} that unregister the listener when executed.
    */
   onClose(callback) {
-    this._onCloseCallbacks.add(callback);
-    return () => this._onCloseCallbacks.delete(callback);
+    this.#onCloseCallbacks.add(callback);
+    return () => this.#onCloseCallbacks.delete(callback);
   }
 }
-
-export default WriterServer;
