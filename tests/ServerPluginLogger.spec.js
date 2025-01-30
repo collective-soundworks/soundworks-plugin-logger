@@ -6,14 +6,15 @@ import { delay } from '@ircam/sc-utils';
 import { Server } from '@soundworks/core/server.js';
 import { Client } from '@soundworks/core/client.js';
 
-import ServerPluginLogger, {
+import ClientPluginLogger from '../src/client.js';
+import ServerPluginLogger from '../src/server.js';
+// protected Symbols for testing
+import {
   kNodeIdWritersMap,
   kPathnameWriterMap,
   kInternalState,
 } from '../src/ServerPluginLogger.js';
-import ClientPluginLogger from '../src/ClientPluginLogger.js';
-
-import { kWriterStream } from '../src/ServerWriter.js'
+import { kWriterStream } from '../src/ServerWriter.js';
 
 const config = {
   app: {

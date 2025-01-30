@@ -249,7 +249,7 @@ export default class ServerPluginLogger extends ServerPlugin {
         await state.set({ cmd: 'ready' });
       },
       // observe only remote clients
-      { excludeLocal: true }
+      { excludeLocal: true },
     );
 
     await this.switch(this.options.dirname);

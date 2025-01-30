@@ -8,16 +8,25 @@
   "license": "BSD-3-Clause",
   "type": "module",
   "exports": {
-    "./client.js": "./src/ClientPluginLogger.js",
-    "./server.js": "./src/ServerPluginLogger.js"
+    "./client.js": {
+      "module": "./src/client.js",
+      "node": "./src/client.js",
+      "types": "./types/client.d.ts"
+    },
+    "./server.js": {
+      "module": "./src/server.js",
+      "node": "./src/server.js",
+      "types": "./types/server.d.ts"
+    }
   },
   "scripts": {
-    "api": "jsdoc-to-readme --src src/*.js",
-    "preversion": "npm run api && npm run toc && git commit -am 'docs: build' --allow-empty",
+    "api": "npm run types && jsdoc-to-readme --src src/*.js",
+    "preversion": "npm run lint && npm run test && npm run api && npm run toc && git commit -am 'docs: build' --allow-empty",
     "test": "mocha tests/*.spec.js",
     "test:only": "mocha",
     "lint": "npx eslint src tests/*.spec.js",
-    "toc": "markdown-toc -i README.md --maxdepth 2"
+    "toc": "markdown-toc -i README.md --maxdepth 2",
+    "types": "rm -rf types && tsc"
   },
   "publishConfig": {
     "access": "public"
@@ -39,9 +48,10 @@
     "chai": "^5.1.2",
     "jsdoc-to-readme": "^2.0.2",
     "markdown-toc": "^1.2.0",
-    "mocha": "^11.1.0"
+    "mocha": "^11.1.0",
+    "typescript": "^5.7.3"
   },
   "peerDependencies": {
-    "@soundworks/core": "^4.0.0-alpha.7"
+    "@soundworks/core": "^5.0.0"
   }
 }
